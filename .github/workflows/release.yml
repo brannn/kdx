@@ -98,6 +98,6 @@ jobs:
 
     - name: Publish to crates.io
       if: steps.check_token.outputs.token_available == 'true'
-      run: cargo publish --token ${{ secrets.CRATES_TOKEN }}
+      run: cargo publish --token ${{ secrets.CRATES_TOKEN }} --allow-dirty
       env:
         CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_TOKEN }}
