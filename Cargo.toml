@@ -1,16 +1,12 @@
 [package]
 name = "kdx"
-version = "0.1.8"
+version = "0.1.9"
 edition = "2021"
 rust-version = "1.87.0"
 description = "K8s Discovery Experience - A command-line tool for exploring Kubernetes clusters"
 license = "MIT"
 repository = "https://github.com/brannn/kdx"
-homepage = "https://github.com/brannn/kdx"
-documentation = "https://docs.rs/kdx"
-keywords = ["kubernetes", "k8s", "cli", "discovery", "devops"]
-categories = ["command-line-utilities", "development-tools"]
-readme = "README.md"
+
 
 [dependencies]
 tokio = { version = "1.0", features = ["full"] }
