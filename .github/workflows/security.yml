@@ -18,7 +18,8 @@ jobs:
     
     - name: Install Rust
       uses: dtolnay/rust-toolchain@1.87.0
-      
+      with:
+        components: rustfmt, clippy      
     - name: Install cargo-audit
       run: cargo install cargo-audit
       
