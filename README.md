@@ -8,12 +8,13 @@
 [![Crates.io](https://img.shields.io/crates/v/kdx.svg)](https://crates.io/crates/kdx)
 [![Downloads](https://img.shields.io/crates/d/kdx.svg)](https://crates.io/crates/kdx)
 [![GitHub release](https://img.shields.io/github/release/brannn/kdx.svg)](https://github.com/brannn/kdx/releases)
-[![GitHub stars](https://img.shields.io/github/stars/brannn/kdx.svg)](https://github.com/brannn/kdx/stargazers)
 [![GitHub issues](https://img.shields.io/github/issues/brannn/kdx.svg)](https://github.com/brannn/kdx/issues)
 [![Homebrew](https://img.shields.io/badge/homebrew-available-brightgreen.svg)](https://github.com/brannn/homebrew-kdx)
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey.svg)](https://github.com/brannn/kdx)
 [![Tests](https://img.shields.io/badge/tests-23%20passing-brightgreen.svg)](https://github.com/brannn/kdx/actions)
 [![Code Coverage](https://img.shields.io/badge/coverage-core%20modules-green.svg)](https://github.com/brannn/kdx)
+[![GitHub stars](https://img.shields.io/github/stars/brannn/kdx.svg)](https://github.com/brannn/kdx/stargazers)
+
 A command-line tool for exploring and discovering resources in Kubernetes clusters. Provides commands for listing services, pods, and understanding cluster topology and relationships.
 
 ## Features
