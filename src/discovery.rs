@@ -2,7 +2,7 @@
 
 use crate::error::{ExplorerError, Result};
 use k8s_openapi::api::core::v1::{Pod, Service};
-use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
+use k8s_openapi::api::networking::v1::Ingress;use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
 use kube::{Api, Client};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
