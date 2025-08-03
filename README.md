@@ -32,6 +32,16 @@ A command-line tool for exploring and discovering resources in Kubernetes cluste
 
 ## Installation
 
+### Homebrew (Recommended)
+
+```bash
+brew install brannn/kdx/kdx
+```
+
+### Download Binary
+
+Download the latest release for your platform from [GitHub Releases](https://github.com/brannn/kdx/releases).
+
 ### From Source
 
 ```bash
@@ -41,7 +51,6 @@ cargo build --release
 ```
 
 The binary will be available at `target/release/kdx`.
-
 ## Usage
 
 
