@@ -97,7 +97,7 @@ pub enum Commands {
     },
 }
 
-#[derive(Clone, ValueEnum)]
+#[derive(Debug, Clone, ValueEnum)]
 pub enum OutputFormat {
     /// Human-readable table format
     Table,
@@ -117,10 +117,80 @@ impl std::fmt::Display for OutputFormat {
     }
 }
 
-#[derive(Clone, ValueEnum)]
+#[derive(Debug, Clone, ValueEnum)]
 pub enum GraphFormat {
     /// DOT format (Graphviz)
     Dot,
     /// SVG format
     Svg,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::Parser;
+
+    #[test]
+    fn test_output_format_default() {
+        let format = OutputFormat::Table;
+        assert!(matches!(format, OutputFormat::Table));
+    }
+
+    #[test]
+    #[test]
+    fn test_output_format_debug() {
+        let format = OutputFormat::Table;
+        let debug_str = format!("{:?}", format);
+        assert!(debug_str.contains("Table"));
+    }
+    #[test]
+    fn test_graph_format_default() {
+        let format = GraphFormat::Dot;
+        assert!(matches!(format, GraphFormat::Dot));
+    }
+
+    #[test]
+    #[test]
+    fn test_graph_format_debug() {
+        let format = GraphFormat::Dot;
+        let debug_str = format!("{:?}", format);
+        assert!(debug_str.contains("Dot"));
+    }
+    #[test]
+    fn test_cli_parsing_services() {
+        let cli = Cli::try_parse_from(&["kdx", "services"]).unwrap();
+        assert!(matches!(cli.command, Commands::Services { .. }));
+    }
+
+    #[test]
+    fn test_cli_parsing_graph_with_options() {
+        let cli = Cli::try_parse_from(&[
+            "kdx", "graph", 
+            "--namespace", "test", 
+            "--format", "svg",
+            "--include-pods",
+            "--highlight", "nginx"
+        ]).unwrap();
+        
+        if let Commands::Graph { namespace, format, include_pods, highlight } = cli.command {
+            assert_eq!(namespace, Some("test".to_string()));
+            assert!(matches!(format, GraphFormat::Svg));
+            assert!(include_pods);
+            assert_eq!(highlight, Some("nginx".to_string()));
+        } else {
+            panic!("Expected Graph command");
+        }
+    }
+
+    #[test]
+    fn test_cli_global_options() {
+        let cli = Cli::try_parse_from(&[
+            "kdx", "--verbose", "--output", "json", "--context", "test-context",
+            "services"
+        ]).unwrap();
+        
+        assert!(cli.verbose);
+        assert!(matches!(cli.output, OutputFormat::Json));
+        assert_eq!(cli.context, Some("test-context".to_string()));
+    }
 }

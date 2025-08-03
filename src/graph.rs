@@ -242,3 +242,52 @@ pub async fn generate_service_graph(
 
     Ok(graph)
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_service_graph_creation() {
+        let graph = ServiceGraph::new();
+        assert_eq!(graph.graph.node_count(), 0);
+        assert_eq!(graph.graph.edge_count(), 0);
+        assert!(graph.node_map.is_empty());
+    }
+
+    #[test]
+    fn test_node_type_debug() {
+        let service_type = NodeType::Service;
+        let debug_str = format!("{:?}", service_type);
+        assert_eq!(debug_str, "Service");
+    }
+
+    #[test]
+    fn test_edge_type_debug() {
+        let edge_type = EdgeType::ServiceToPod;
+        let debug_str = format!("{:?}", edge_type);
+        assert_eq!(debug_str, "ServiceToPod");
+    }
+
+    #[test]
+    fn test_service_node_creation() {
+        let node = ServiceNode {
+            name: "test".to_string(),
+            namespace: "default".to_string(),
+            node_type: NodeType::Service,
+            is_highlighted: false,
+        };
+        assert_eq!(node.name, "test");
+        assert_eq!(node.namespace, "default");
+        assert!(!node.is_highlighted);
+    }
+
+    #[test]
+    fn test_service_edge_creation() {
+        let edge = ServiceEdge {
+            relationship: EdgeType::ServiceToPod,
+        };
+        assert!(matches!(edge.relationship, EdgeType::ServiceToPod));
+    }
+}

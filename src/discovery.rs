@@ -464,3 +464,79 @@ pub struct ServiceTopology {
     pub ingress_routes: Vec<String>, // TODO: Define proper ingress types
     pub dependencies: Vec<String>,   // TODO: Define proper dependency types
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_service_info_creation() {
+        let service = ServiceInfo {
+            name: "test-service".to_string(),
+            namespace: "default".to_string(),
+            ports: vec![],
+            cluster_ip: Some("10.0.0.1".to_string()),
+            service_type: "ClusterIP".to_string(),
+            selector: Some(std::collections::BTreeMap::new()),
+        };
+
+        assert_eq!(service.name, "test-service");
+        assert_eq!(service.namespace, "default");
+        assert_eq!(service.service_type, "ClusterIP");
+        assert_eq!(service.cluster_ip, Some("10.0.0.1".to_string()));
+    }
+
+    #[test]
+    fn test_pod_info_creation() {
+        let pod = PodInfo {
+            name: "test-pod".to_string(),
+            namespace: "default".to_string(),
+            phase: "Running".to_string(),
+            pod_ip: Some("10.0.0.2".to_string()),
+            node_name: Some("node1".to_string()),
+            labels: std::collections::BTreeMap::new(),
+            ready_containers: 2,
+            total_containers: 2,
+            restart_count: 0,
+            age: "1d".to_string(),
+        };
+
+        assert_eq!(pod.name, "test-pod");
+        assert_eq!(pod.phase, "Running");
+        assert_eq!(pod.ready_containers, 2);
+        assert_eq!(pod.total_containers, 2);
+        assert_eq!(pod.restart_count, 0);
+    }
+
+    #[test]
+    fn test_ingress_info_creation() {
+        let ingress = IngressInfo {
+            name: "test-ingress".to_string(),
+            namespace: "default".to_string(),
+            hosts: vec!["example.com".to_string()],
+            paths: vec![],
+            tls_enabled: false,
+        };
+
+        assert_eq!(ingress.name, "test-ingress");
+        assert_eq!(ingress.namespace, "default");
+        assert_eq!(ingress.hosts.len(), 1);
+        assert!(!ingress.tls_enabled);
+    }
+
+    #[test]
+    #[test]
+    fn test_service_port_creation() {
+        let port = ServicePort {
+            name: Some("http".to_string()),
+            port: 80,
+            target_port: "8080".to_string(),
+            protocol: "TCP".to_string(),
+        };
+
+        assert_eq!(port.name, Some("http".to_string()));
+        assert_eq!(port.port, 80);
+        assert_eq!(port.target_port, "8080");
+        assert_eq!(port.protocol, "TCP");
+    }}
