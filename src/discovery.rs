@@ -103,11 +103,26 @@ impl DiscoveryEngine {
         Ok(ServiceTopology {
             service: description.service,
             backend_pods: description.related_pods,
-            ingress_routes: Vec::new(), // TODO: Implement ingress discovery
-            dependencies: Vec::new(),   // TODO: Implement dependency analysis
+            ingress_routes: self.get_ingress_routes_for_topology(name, namespace).await.unwrap_or_default(),
+            dependencies: Vec::new(), // Basic dependency analysis could be added here
         })
     }
 
+    async fn get_ingress_routes_for_topology(&self, service_name: &str, namespace: &str) -> Result<Vec<String>> {
+        let ingress_routes = self.discover_ingress_for_service(service_name, namespace).await?;
+        let route_strings: Vec<String> = ingress_routes.iter()
+            .flat_map(|ingress| {
+                ingress.hosts.iter().map(|host| {
+                    if ingress.tls_enabled {
+                        format!("https://{}", host)
+                    } else {
+                        format!("http://{}", host)
+                    }
+                })
+            })
+            .collect();
+        Ok(route_strings)
+    }
     /// Discover ingress resources that route to a specific service
     pub async fn discover_ingress_for_service(&self, service_name: &str, namespace: &str) -> Result<Vec<IngressInfo>> {
         let ingresses: Api<Ingress> = Api::namespaced(self.client.clone(), namespace);
@@ -126,11 +141,43 @@ impl DiscoveryEngine {
     }    
 
     /// Discover ConfigMaps and Secrets used by a service (placeholder implementation)
-    pub async fn discover_service_configuration(&self, _service_name: &str, _namespace: &str) -> Result<(Vec<ConfigMapInfo>, Vec<SecretInfo>)> {
-        // TODO: Implement full configuration discovery
-        // For now, return empty lists as a placeholder
-        Ok((Vec::new(), Vec::new()))
-    }
+    pub async fn discover_service_configuration(&self, service_name: &str, namespace: &str) -> Result<(Vec<ConfigMapInfo>, Vec<SecretInfo>)> {
+        // Basic implementation: check if common ConfigMaps and Secrets exist
+        let configmaps: Api<ConfigMap> = Api::namespaced(self.client.clone(), namespace);
+        let secrets: Api<Secret> = Api::namespaced(self.client.clone(), namespace);
+        
+        let mut found_configmaps = Vec::new();
+        let mut found_secrets = Vec::new();
+        
+        // Look for common configuration patterns
+        let common_config_names = vec![
+            service_name.to_string(),
+            format!("{}-config", service_name),
+            format!("{}-configuration", service_name),
+        ];
+        
+        for config_name in common_config_names {
+            // Check for ConfigMap
+            if let Ok(_) = configmaps.get(&config_name).await {
+                found_configmaps.push(ConfigMapInfo {
+                    name: config_name.clone(),
+                    namespace: namespace.to_string(),
+                    mount_path: None, // Would need pod analysis to determine
+                });
+            }
+            
+            // Check for Secret
+            if let Ok(_) = secrets.get(&config_name).await {
+                found_secrets.push(SecretInfo {
+                    name: config_name,
+                    namespace: namespace.to_string(),
+                    mount_path: None, // Would need pod analysis to determine
+                    secret_type: "Opaque".to_string(),
+                });
+            }
+        }
+        
+        Ok((found_configmaps, found_secrets))    }
 
     /// Check the health of a service by testing its cluster IP endpoints
     pub async fn check_service_health(&self, service_name: &str, namespace: &str) -> Result<ServiceHealth> {
