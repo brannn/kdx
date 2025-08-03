@@ -314,6 +314,15 @@ pub struct SecretInfo {
     pub namespace: String,
     pub mount_path: Option<String>,
     pub secret_type: String,
+}
+
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ServiceHealth {
+    pub service_name: String,
+    pub namespace: String,
+    pub overall_healthy: bool,
+    pub checked_at: String,
 }#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServiceDescription {
     pub service: ServiceInfo,
