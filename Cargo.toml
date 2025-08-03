@@ -1,40 +1,24 @@
 [package]
-name = "k8s-explorer"
+name = "kdx"
 version = "0.1.0"
 edition = "2021"
-description = "A Kubernetes cluster exploration and discovery tool"
+description = "K8s Discovery Experience - A command-line tool for exploring Kubernetes clusters"
 license = "MIT"
-repository = "https://github.com/yourusername/k8s-explorer"
-keywords = ["kubernetes", "k8s", "cli", "discovery", "exploration"]
-categories = ["command-line-utilities", "development-tools"]
+repository = "https://github.com/brannn/kdx"
 
 [dependencies]
-# Kubernetes client
-kube = { version = "0.87", features = ["client", "config"] }
-k8s-openapi = { version = "0.20", features = ["latest"] }
-
-# Async runtime
 tokio = { version = "1.0", features = ["full"] }
-
-# CLI framework
+kube = { version = "0.87", features = ["client", "ws"] }
+k8s-openapi = { version = "0.20", features = ["v1_28"] }
 clap = { version = "4.0", features = ["derive"] }
-
-# Serialization
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_yaml = "0.9"
-chrono = { version = "0.4", features = ["serde"] }
-reqwest = { version = "0.11", features = ["json"] }# Output formatting
+thiserror = "1.0"
 tabled = "0.15"
 colored = "2.0"
-
-# Error handling
-thiserror = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+reqwest = { version = "0.11", features = ["json"] }
 anyhow = "1.0"
-
-# Logging
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-
-[dev-dependencies]
-tokio-test = "0.4"
+tracing-subscriber = "0.3"

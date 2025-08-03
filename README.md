@@ -1,156 +1,137 @@
-# k8s-explorer
+# kdx - K8s Discovery Experience
 
-A command-line tool for exploring and discovering resources in Kubernetes clusters.
+A command-line tool for exploring and discovering resources in Kubernetes clusters. Provides commands for listing services, pods, and understanding cluster topology and relationships.
 
 ## Features
 
-- 🔍 **Service Discovery**: List and explore services across namespaces
-- 🚀 **Pod Exploration**: Find pods with flexible filtering options
-- 📊 **Service Descriptions**: Get detailed information about services and their relationships
-- 🌐 **Topology Analysis**: Understand service topology and backend connections
-- 📋 **Multiple Output Formats**: Table, JSON, and YAML output support
-- 🎯 **Namespace Filtering**: Work with specific namespaces or across all namespaces
+- Service Discovery: List and explore services across namespaces
+- Pod Exploration: Find pods with flexible filtering options
+- Service Descriptions: Get detailed information about services and their relationships
+- Topology Analysis: Understand service topology and backend connections
+- Multiple Output Formats: Table, JSON, and YAML output support
+- Namespace Filtering: Work with specific namespaces or across all namespaces
+- Ingress Discovery: Show which services are exposed via ingress
+- Configuration Analysis: Discover ConfigMaps and Secrets used by services
+- Health Checking: Test service accessibility
 
 ## Installation
 
 ### From Source
 
 ```bash
-git clone https://github.com/yourusername/k8s-explorer
-cd k8s-explorer
-cargo install --path .
+git clone https://github.com/brannn/kdx
+cd kdx
+cargo build --release
 ```
 
-### Using Cargo
-
-```bash
-cargo install k8s-explorer
-```
+The binary will be available at `target/release/kdx`.
 
 ## Usage
 
-### List Services
+### Basic Commands
 
+List all services in the default namespace:
 ```bash
-# List services in the default namespace
-k8s-explorer services
-
-# List services in a specific namespace
-k8s-explorer services --namespace monitoring
-
-# List services across all namespaces
-k8s-explorer services --all-namespaces
-
-# Output as JSON
-k8s-explorer services --output json
+kdx services
 ```
 
-### List Pods
-
+List all pods in a specific namespace:
 ```bash
-# List pods in the default namespace
-k8s-explorer pods
-
-# List pods with label selector
-k8s-explorer pods --selector app=nginx
-
-# List pods across all namespaces
-k8s-explorer pods --all-namespaces
+kdx pods -n monitoring
 ```
 
-### Describe Services
-
+Get detailed information about a service:
 ```bash
-# Get detailed information about a service
-k8s-explorer describe grafana --namespace monitoring
-
-# Output as YAML
-k8s-explorer describe grafana --namespace monitoring --output yaml
+kdx describe grafana -n monitoring
 ```
 
-### Service Topology
-
+Show service topology:
 ```bash
-# Analyze service topology and relationships
-k8s-explorer topology grafana --namespace monitoring
+kdx topology grafana -n monitoring
 ```
 
-### Global Options
+### Output Formats
+
+kdx supports multiple output formats:
 
 ```bash
-# Use a specific Kubernetes context
-k8s-explorer services --context my-cluster
+# Human-readable table (default)
+kdx services
 
-# Set default namespace
-k8s-explorer services --namespace production
+# JSON output
+kdx services --output json
 
-# Enable verbose logging
-k8s-explorer services --verbose
+# YAML output
+kdx services --output yaml
+```
+
+### Namespace Options
+
+```bash
+# Specific namespace
+kdx services -n kube-system
+
+# All namespaces
+kdx services --all-namespaces
+
+# Use context default namespace
+kdx services
 ```
 
 ## Examples
 
-### Exploring a Monitoring Stack
+### Service Discovery
 
 ```bash
-# List all services in the monitoring namespace
-k8s-explorer services -n monitoring
+# List services with selector filtering
+kdx services --selector app=nginx
 
-# Get detailed information about Grafana
-k8s-explorer describe grafana -n monitoring
-
-# See the topology of Prometheus
-k8s-explorer topology prometheus -n monitoring
-
-# Find all pods related to alertmanager
-k8s-explorer pods -n monitoring -s app=alertmanager
+# List services in JSON format
+kdx services --output json -n production
 ```
 
-### Cross-Namespace Discovery
+### Pod Exploration
 
 ```bash
-# Find all nginx services across the cluster
-k8s-explorer services -A | grep nginx
+# List all pods
+kdx pods
 
-# List all running pods across all namespaces
-k8s-explorer pods -A --output json | jq '.[] | select(.phase == "Running")'
+# Filter pods by selector
+kdx pods --selector app=web
+
+# Show pods across all namespaces
+kdx pods --all-namespaces
 ```
 
-## Configuration
-
-k8s-explorer uses your existing kubectl configuration. It will automatically detect:
-
-- Current Kubernetes context
-- Default namespace
-- Authentication credentials
-
-You can override these with command-line flags:
+### Service Analysis
 
 ```bash
-k8s-explorer services --context staging --namespace default
+# Get comprehensive service information
+kdx describe api-service -n production
+
+# Show service topology and relationships
+kdx topology frontend -n web
 ```
-
-## Output Formats
-
-### Table (Default)
-Human-readable table format with colored status indicators.
-
-### JSON
-Machine-readable JSON format for scripting and automation.
-
-### YAML
-YAML format for configuration management and documentation.
 
 ## Requirements
 
 - Kubernetes cluster access
 - Valid kubeconfig file
-- Appropriate RBAC permissions for listing services and pods
+- kubectl installed and configured
 
-## Contributing
+## Configuration
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+kdx uses your existing kubectl configuration. Ensure you have:
+
+1. A valid kubeconfig file (usually at `~/.kube/config`)
+2. Appropriate cluster access permissions
+3. kubectl configured for your target cluster
+
+You can verify your configuration with:
+```bash
+kubectl cluster-info
+```
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT License
