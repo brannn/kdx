@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.1.0] - 2025-08-03
 
 ### Added
 - Service discovery and listing
@@ -18,6 +18,6 @@
 - Professional CLI with clap
 - Error handling and validation
 
-## [0.1.0] - TBD
+## [0.1.0] - 2025-08-03
 
 Initial release
