@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.1.1] - 2025-08-03
+
+### Added
+- Multi-platform release builds (Linux x86_64, macOS x86_64, macOS ARM64)
+- Automated Homebrew formula updates via GitHub Actions
+- Enhanced installation instructions in README
+
+### Changed
+- Improved release workflow with cross-platform support
+- Updated Homebrew formula to support Linux and Intel macOS
+
 ## [0.1.0] - 2025-08-03
 
 ### Added
