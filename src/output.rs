@@ -118,14 +118,8 @@ fn print_pods_table(pods: &[PodInfo]) {
         node: String,
     }    
     let rows: Vec<PodRow> = pods.iter().map(|pod| {
-        let status = match pod.phase.as_str() {
-            "Running" => pod.phase.green().to_string(),
-            "Pending" => pod.phase.yellow().to_string(),
-            "Failed" => pod.phase.red().to_string(),
-            "Succeeded" => pod.phase.blue().to_string(),
-            _ => pod.phase.clone(),
-        };
-        
+        // Use plain text for table alignment - colors mess up column widths
+        let status = pod.phase.clone();        
         PodRow {
             name: pod.name.clone(),
             namespace: pod.namespace.clone(),
