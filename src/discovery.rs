@@ -1,7 +1,7 @@
 //! Kubernetes resource discovery and analysis
 
 use crate::error::{ExplorerError, Result};
-use k8s_openapi::api::core::v1::{Pod, Service};
+use k8s_openapi::api::core::v1::{Pod, Service, ConfigMap, Secret};
 use k8s_openapi::api::networking::v1::Ingress;use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
 use kube::{Api, Client};
 use serde::{Deserialize, Serialize};
@@ -294,7 +294,21 @@ pub struct IngressPath {
     pub service_name: String,
     pub service_port: String,
 }
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConfigMapInfo {
+    pub name: String,
+    pub namespace: String,
+    pub mount_path: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SecretInfo {
+    pub name: String,
+    pub namespace: String,
+    pub mount_path: Option<String>,
+    pub secret_type: String,
+}#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServiceDescription {
     pub service: ServiceInfo,
     pub related_pods: Vec<PodInfo>,
