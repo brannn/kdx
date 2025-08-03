@@ -124,7 +124,13 @@ impl DiscoveryEngine {
         
         Ok(matching_ingresses)
     }    
-    async fn convert_service_to_info(&self, service: Service) -> Option<ServiceInfo> {
+
+    /// Discover ConfigMaps and Secrets used by a service (placeholder implementation)
+    pub async fn discover_service_configuration(&self, _service_name: &str, _namespace: &str) -> Result<(Vec<ConfigMapInfo>, Vec<SecretInfo>)> {
+        // TODO: Implement full configuration discovery
+        // For now, return empty lists as a placeholder
+        Ok((Vec::new(), Vec::new()))
+    }    async fn convert_service_to_info(&self, service: Service) -> Option<ServiceInfo> {
         let metadata = service.metadata;
         let spec = service.spec?;
         

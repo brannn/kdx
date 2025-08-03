@@ -1,7 +1,7 @@
 //! Output formatting for different data types
 
 use crate::cli::OutputFormat;
-use crate::discovery::{ServiceInfo, PodInfo, ServiceDescription, ServiceTopology, IngressInfo};
+use crate::discovery::{ServiceInfo, PodInfo, ServiceDescription, ServiceTopology, IngressInfo, ConfigMapInfo, SecretInfo};
 use crate::error::{ExplorerError, Result};
 use colored::*;
 use tabled::{Table, Tabled};
@@ -261,5 +261,65 @@ fn print_ingress_table(ingress_routes: &[IngressInfo]) {
             }
         }
         println!();
+    }
+}
+
+/// Print configuration information (ConfigMaps and Secrets) in the specified format
+pub fn print_configuration_info(configmaps: &[ConfigMapInfo], secrets: &[SecretInfo], format: &OutputFormat) -> Result<()> {
+    match format {
+        OutputFormat::Table => print_configuration_table(configmaps, secrets),
+        OutputFormat::Json => {
+            let config = serde_json::json!({
+                "configmaps": configmaps,
+                "secrets": secrets
+            });
+            print_json(&config)?;
+        },
+        OutputFormat::Yaml => {
+            let config = serde_json::json!({
+                "configmaps": configmaps,
+                "secrets": secrets
+            });
+            print_yaml(&config)?;
+        },
+    }
+    
+    Ok(())
+}
+
+fn print_configuration_table(configmaps: &[ConfigMapInfo], secrets: &[SecretInfo]) {
+    if configmaps.is_empty() && secrets.is_empty() {
+        return;
+    }
+    
+    println!("\nConfiguration:");
+    
+    if !configmaps.is_empty() {
+        println!("  ConfigMaps:");
+        for cm in configmaps {
+            let mount_info = cm.mount_path.as_ref()
+                .map(|path| format!(" (mounted at {})", path))
+                .unwrap_or_else(|| " (environment variable)".to_string());
+            println!("    {} (namespace: {}){}", 
+                cm.name.cyan(), 
+                cm.namespace, 
+                mount_info
+            );
+        }
+    }
+    
+    if !secrets.is_empty() {
+        println!("  Secrets:");
+        for secret in secrets {
+            let mount_info = secret.mount_path.as_ref()
+                .map(|path| format!(" (mounted at {})", path))
+                .unwrap_or_else(|| " (environment variable)".to_string());
+            println!("    {} (namespace: {}, type: {}){}", 
+                secret.name.yellow(), 
+                secret.namespace, 
+                secret.secret_type,
+                mount_info
+            );
+        }
     }
 }

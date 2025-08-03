@@ -75,7 +75,12 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
             let ingress_routes = discovery.discover_ingress_for_service(&service, ns).await.unwrap_or_default();
             if !ingress_routes.is_empty() {
                 output::print_ingress_info(&ingress_routes, &cli.output)?;
-            }        }
+            
+            // Also show configuration information if available
+            let (configmaps, secrets) = discovery.discover_service_configuration(&service, ns).await.unwrap_or_default();
+            if !configmaps.is_empty() || !secrets.is_empty() {
+                output::print_configuration_info(&configmaps, &secrets, &cli.output)?;
+            }            }        }
         Commands::Topology { service, namespace } => {
             let ns = namespace.as_deref().or(cli.namespace.as_deref()).unwrap_or("default");
             let topology = discovery.analyze_service_topology(&service, ns).await?;
