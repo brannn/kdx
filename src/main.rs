@@ -8,6 +8,7 @@ mod cli;
 mod discovery;
 mod output;
 mod error;
+mod graph;
 
 use cli::{Cli, Commands};
 use discovery::ServiceHealth;
@@ -95,7 +96,19 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
             let topology = discovery.analyze_service_topology(&service, ns).await?;
             output::print_service_topology(&topology, &cli.output)?;
         }
-    }
+        Commands::Graph { namespace, format, include_pods, highlight } => {
+            let ns = namespace.as_deref();
+            let service_graph = graph::generate_service_graph(&discovery, ns, include_pods, highlight.as_deref()).await?;
+            
+            match format {
+                cli::GraphFormat::Dot => {
+                    println!("{}", service_graph.to_dot());
+                }
+                cli::GraphFormat::Svg => {
+                    println!("{}", service_graph.to_svg()?);
+                }
+            }
+        }    }
     
     Ok(())
 }

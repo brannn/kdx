@@ -83,9 +83,16 @@ pub enum Commands {
         
         /// Output format for the graph
         #[clap(long, default_value = "dot")]
-        format: GraphFormat,
+        output: GraphFormat,
         
-        /// Include pod relationships in the graph
+
+#[derive(Clone, ValueEnum)]
+pub enum GraphFormat {
+    /// DOT format (Graphviz)
+    Dot,
+    /// SVG format
+    Svg,
+}        /// Include pod relationships in the graph
         #[clap(long)]
         include_pods: bool,
         
@@ -112,12 +119,4 @@ impl std::fmt::Display for OutputFormat {
             OutputFormat::Yaml => write!(f, "yaml"),
         }
     }
-}
-
-#[derive(Clone, ValueEnum)]
-pub enum GraphFormat {
-    /// DOT format (Graphviz)
-    Dot,
-    /// SVG format
-    Svg,
 }
