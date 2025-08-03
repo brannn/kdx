@@ -1,0 +1,25 @@
+name: Update Homebrew Formula
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  update-formula:
+    name: Update Homebrew Formula
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Update Homebrew formula
+      uses: mislav/bump-homebrew-formula-action@v3
+      with:
+        formula-name: kdx
+        formula-path: Formula/kdx.rb
+        homebrew-tap: brannn/homebrew-kdx
+        download-url: https://github.com/brannn/kdx/releases/download/${{ github.event.release.tag_name }}/kdx-macos-aarch64.tar.gz
+        commit-message: |
+          Update kdx to ${{ github.event.release.tag_name }}
+          
+          Automated update via GitHub Actions
+      env:
+        COMMITTER_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
