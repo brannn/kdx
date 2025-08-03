@@ -107,7 +107,23 @@ impl DiscoveryEngine {
             dependencies: Vec::new(),   // TODO: Implement dependency analysis
         })
     }
-    
+
+    /// Discover ingress resources that route to a specific service
+    pub async fn discover_ingress_for_service(&self, service_name: &str, namespace: &str) -> Result<Vec<IngressInfo>> {
+        let ingresses: Api<Ingress> = Api::namespaced(self.client.clone(), namespace);
+        
+        let ingress_list = ingresses.list(&Default::default()).await?;
+        
+        let mut matching_ingresses = Vec::new();
+        
+        for ingress in ingress_list.items {
+            if let Some(ingress_info) = self.convert_ingress_to_info(ingress, service_name).await {
+                matching_ingresses.push(ingress_info);
+            }
+        }
+        
+        Ok(matching_ingresses)
+    }    
     async fn convert_service_to_info(&self, service: Service) -> Option<ServiceInfo> {
         let metadata = service.metadata;
         let spec = service.spec?;
@@ -168,7 +184,68 @@ impl DiscoveryEngine {
             age: "Unknown".to_string(), // TODO: Calculate from creation timestamp
         })
     }
-}
+
+    async fn convert_ingress_to_info(&self, ingress: Ingress, target_service: &str) -> Option<IngressInfo> {
+        let metadata = ingress.metadata;
+        let spec = ingress.spec?;
+        
+        let name = metadata.name?;
+        let namespace = metadata.namespace.unwrap_or_else(|| "default".to_string());
+        
+        let mut hosts = Vec::new();
+        let mut paths = Vec::new();
+        let mut service_found = false;
+        
+        // Check if this ingress routes to our target service
+        if let Some(rules) = spec.rules {
+            for rule in rules {
+                if let Some(host) = rule.host {
+                    hosts.push(host);
+                }
+                
+                if let Some(http) = rule.http {
+                    for path in http.paths {
+                        if let Some(backend) = path.backend.service {
+                            if backend.name == target_service {
+                                service_found = true;
+                                let port_str = match backend.port {
+                                    Some(port) => {
+                                        if let Some(number) = port.number {
+                                            number.to_string()
+                                        } else if let Some(name) = port.name {
+                                            name
+                                        } else {
+                                            "unknown".to_string()
+                                        }
+                                    }
+                                    None => "unknown".to_string(),
+                                };
+                                
+                                paths.push(IngressPath {
+                                    path: path.path.unwrap_or_else(|| "/".to_string()),
+                                    service_name: backend.name,
+                                    service_port: port_str,
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Only return ingress info if it actually routes to our target service
+        if service_found {
+            Some(IngressInfo {
+                name,
+                namespace,
+                hosts,
+                paths,
+                tls_enabled: spec.tls.is_some() && !spec.tls.unwrap().is_empty(),
+            })
+        } else {
+            None
+        }
+    }}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServiceInfo {
