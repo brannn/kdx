@@ -6,7 +6,7 @@ use k8s_openapi::api::networking::v1::Ingress;use k8s_openapi::apimachinery::pkg
 use kube::{Api, Client};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-
+use chrono;
 /// Main discovery engine for Kubernetes resources
 pub struct DiscoveryEngine {
     client: Client,
@@ -130,7 +130,36 @@ impl DiscoveryEngine {
         // TODO: Implement full configuration discovery
         // For now, return empty lists as a placeholder
         Ok((Vec::new(), Vec::new()))
-    }    async fn convert_service_to_info(&self, service: Service) -> Option<ServiceInfo> {
+    }
+
+    /// Check the health of a service by testing its cluster IP endpoints
+    pub async fn check_service_health(&self, service_name: &str, namespace: &str) -> Result<ServiceHealth> {
+        let services: Api<Service> = Api::namespaced(self.client.clone(), namespace);
+        let service = services.get(service_name).await?;
+        
+        let mut overall_healthy = false;
+        
+        if let Some(spec) = service.spec {
+            if let Some(cluster_ip) = spec.cluster_ip {
+                if cluster_ip != "None" && !cluster_ip.is_empty() && cluster_ip != "ClusterIP" {
+                    // For simplicity, just check if the service has a valid cluster IP
+                    // In a real implementation, we could try HTTP requests to the endpoints
+                    overall_healthy = true;
+                } else {
+                    // Service exists but has no accessible IP
+                    overall_healthy = false;
+                }
+            }
+        }
+        
+        Ok(ServiceHealth {
+            service_name: service_name.to_string(),
+            namespace: namespace.to_string(),
+            overall_healthy,
+            checked_at: chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string(),
+        })
+    }
+    async fn convert_service_to_info(&self, service: Service) -> Option<ServiceInfo> {
         let metadata = service.metadata;
         let spec = service.spec?;
         

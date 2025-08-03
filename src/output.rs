@@ -1,7 +1,7 @@
 //! Output formatting for different data types
 
 use crate::cli::OutputFormat;
-use crate::discovery::{ServiceInfo, PodInfo, ServiceDescription, ServiceTopology, IngressInfo, ConfigMapInfo, SecretInfo};
+use crate::discovery::{ServiceInfo, PodInfo, ServiceDescription, ServiceTopology, IngressInfo, ConfigMapInfo, SecretInfo, ServiceHealth};
 use crate::error::{ExplorerError, Result};
 use colored::*;
 use tabled::{Table, Tabled};
@@ -321,5 +321,33 @@ fn print_configuration_table(configmaps: &[ConfigMapInfo], secrets: &[SecretInfo
                 mount_info
             );
         }
+    }
+}
+
+/// Print health information in the specified format
+pub fn print_health_info(health: &ServiceHealth, format: &OutputFormat) -> Result<()> {
+    match format {
+        OutputFormat::Table => print_health_table(health),
+        OutputFormat::Json => print_json(&health)?,
+        OutputFormat::Yaml => print_yaml(&health)?,
+    }
+    
+    Ok(())
+}
+
+fn print_health_table(health: &ServiceHealth) {
+    println!("\nHealth Status:");
+    
+    let status_color = if health.overall_healthy {
+        "Healthy".green()
+    } else {
+        "Unhealthy".red()
+    };
+    
+    println!("  Status: {}", status_color);
+    println!("  Checked at: {}", health.checked_at);
+    
+    if !health.overall_healthy {
+        println!("  Note: Service may not be accessible or may not have a valid cluster IP");
     }
 }

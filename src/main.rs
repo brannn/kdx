@@ -10,6 +10,7 @@ mod output;
 mod error;
 
 use cli::{Cli, Commands};
+use discovery::ServiceHealth;
 use clap::Parser;
 use std::process;
 
@@ -80,7 +81,15 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
             let (configmaps, secrets) = discovery.discover_service_configuration(&service, ns).await.unwrap_or_default();
             if !configmaps.is_empty() || !secrets.is_empty() {
                 output::print_configuration_info(&configmaps, &secrets, &cli.output)?;
-            }            }        }
+            
+            // Also show health information
+            let health = discovery.check_service_health(&service, ns).await.unwrap_or_else(|_| ServiceHealth {
+                service_name: service.clone(),
+                namespace: ns.to_string(),
+                overall_healthy: false,
+                checked_at: "Error checking health".to_string(),
+            });
+            output::print_health_info(&health, &cli.output)?;            }            }        }
         Commands::Topology { service, namespace } => {
             let ns = namespace.as_deref().or(cli.namespace.as_deref()).unwrap_or("default");
             let topology = discovery.analyze_service_topology(&service, ns).await?;
