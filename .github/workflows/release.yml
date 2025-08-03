@@ -86,5 +86,18 @@ jobs:
     - name: Install Rust
       uses: dtolnay/rust-toolchain@1.87.0
 
+    - name: Check if CRATES_TOKEN is available
+      id: check_token
+      run: |
+        if [ -n "${{ secrets.CRATES_TOKEN }}" ]; then
+          echo "token_available=true" >> $GITHUB_OUTPUT
+        else
+          echo "token_available=false" >> $GITHUB_OUTPUT
+          echo "CRATES_TOKEN not set, skipping crates.io publish"
+        fi
+
     - name: Publish to crates.io
+      if: steps.check_token.outputs.token_available == 'true'
       run: cargo publish --token ${{ secrets.CRATES_TOKEN }}
+      env:
+        CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_TOKEN }}
