@@ -1,7 +1,7 @@
-use crate::discovery::{DiscoveryEngine, ServiceInfo, PodInfo, IngressInfo};
+use crate::discovery::{DiscoveryEngine, IngressInfo, PodInfo, ServiceInfo};
 use crate::error::Result;
-use petgraph::Graph;
 use petgraph::graph::{NodeIndex, UnGraph};
+use petgraph::Graph;
 use std::collections::HashMap;
 use std::fmt::Write;
 
@@ -18,7 +18,6 @@ pub enum NodeType {
     Service,
     Pod,
     Ingress,
-    External,
 }
 
 #[derive(Debug, Clone)]
@@ -30,8 +29,6 @@ pub struct ServiceEdge {
 pub enum EdgeType {
     ServiceToPod,
     IngressToService,
-    ServiceDependency,
-    ConfigurationUsage,
 }
 
 pub struct ServiceGraph {
@@ -49,7 +46,7 @@ impl ServiceGraph {
 
     pub fn add_service_node(&mut self, service: &ServiceInfo, is_highlighted: bool) -> NodeIndex {
         let node_id = format!("service:{}:{}", service.namespace, service.name);
-        
+
         if let Some(&existing_idx) = self.node_map.get(&node_id) {
             return existing_idx;
         }
@@ -68,7 +65,7 @@ impl ServiceGraph {
 
     pub fn add_pod_node(&mut self, pod: &PodInfo) -> NodeIndex {
         let node_id = format!("pod:{}:{}", pod.namespace, pod.name);
-        
+
         if let Some(&existing_idx) = self.node_map.get(&node_id) {
             return existing_idx;
         }
@@ -87,7 +84,7 @@ impl ServiceGraph {
 
     pub fn add_ingress_node(&mut self, ingress: &IngressInfo) -> NodeIndex {
         let node_id = format!("ingress:{}:{}", ingress.namespace, ingress.name);
-        
+
         if let Some(&existing_idx) = self.node_map.get(&node_id) {
             return existing_idx;
         }
@@ -116,16 +113,23 @@ impl ServiceGraph {
         writeln!(dot, "graph ServiceDependencies {{").unwrap();
         writeln!(dot, "  rankdir=TB;").unwrap();
         writeln!(dot, "  node [shape=box, style=rounded];").unwrap();
-        writeln!(dot, "").unwrap();
+        writeln!(dot).unwrap();
 
         // Add nodes
         for node_idx in self.graph.node_indices() {
             if let Some(node) = self.graph.node_weight(node_idx) {
                 let (shape, color, style) = match node.node_type {
-                    NodeType::Service => ("box", if node.is_highlighted { "red" } else { "lightblue" }, "filled"),
+                    NodeType::Service => (
+                        "box",
+                        if node.is_highlighted {
+                            "red"
+                        } else {
+                            "lightblue"
+                        },
+                        "filled",
+                    ),
                     NodeType::Pod => ("ellipse", "lightgreen", "filled"),
                     NodeType::Ingress => ("diamond", "orange", "filled"),
-                    NodeType::External => ("box", "gray", "dashed"),
                 };
 
                 writeln!(
@@ -137,11 +141,12 @@ impl ServiceGraph {
                     shape,
                     color,
                     style
-                ).unwrap();
+                )
+                .unwrap();
             }
         }
 
-        writeln!(dot, "").unwrap();
+        writeln!(dot).unwrap();
 
         // Add edges
         for edge_idx in self.graph.edge_indices() {
@@ -150,8 +155,6 @@ impl ServiceGraph {
                     let (style, label) = match edge.relationship {
                         EdgeType::ServiceToPod => ("solid", "manages"),
                         EdgeType::IngressToService => ("bold", "exposes"),
-                        EdgeType::ServiceDependency => ("dashed", "depends on"),
-                        EdgeType::ConfigurationUsage => ("dotted", "uses config"),
                     };
 
                     writeln!(
@@ -161,7 +164,8 @@ impl ServiceGraph {
                         to.index(),
                         style,
                         label
-                    ).unwrap();
+                    )
+                    .unwrap();
                 }
             }
         }
@@ -209,7 +213,9 @@ pub async fn generate_service_graph(
             if let Ok(pods) = discovery.list_pods(Some(&service.namespace), None).await {
                 for pod in pods {
                     let pod_idx = graph.add_pod_node(&pod);
-                    if let Some(&service_idx) = service_nodes.get(&format!("{}:{}", service.namespace, service.name)) {
+                    if let Some(&service_idx) =
+                        service_nodes.get(&format!("{}:{}", service.namespace, service.name))
+                    {
                         graph.add_edge(service_idx, pod_idx, EdgeType::ServiceToPod);
                     }
                 }
@@ -219,10 +225,15 @@ pub async fn generate_service_graph(
 
     // Add ingress relationships
     for service in &services {
-        if let Ok(ingresses) = discovery.discover_ingress_for_service(&service.name, &service.namespace).await {
+        if let Ok(ingresses) = discovery
+            .discover_ingress_for_service(&service.name, &service.namespace)
+            .await
+        {
             for ingress in ingresses {
                 let ingress_idx = graph.add_ingress_node(&ingress);
-                if let Some(&service_idx) = service_nodes.get(&format!("{}:{}", service.namespace, service.name)) {
+                if let Some(&service_idx) =
+                    service_nodes.get(&format!("{}:{}", service.namespace, service.name))
+                {
                     graph.add_edge(ingress_idx, service_idx, EdgeType::IngressToService);
                 }
             }
