@@ -70,7 +70,12 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
             let ns = namespace.as_deref().or(cli.namespace.as_deref()).unwrap_or("default");
             let service_info = discovery.describe_service(&service, ns).await?;
             output::print_service_description(&service_info, &cli.output)?;
-        }
+            
+            // Also show ingress information if available
+            let ingress_routes = discovery.discover_ingress_for_service(&service, ns).await.unwrap_or_default();
+            if !ingress_routes.is_empty() {
+                output::print_ingress_info(&ingress_routes, &cli.output)?;
+            }        }
         Commands::Topology { service, namespace } => {
             let ns = namespace.as_deref().or(cli.namespace.as_deref()).unwrap_or("default");
             let topology = discovery.analyze_service_topology(&service, ns).await?;

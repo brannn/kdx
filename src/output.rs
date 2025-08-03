@@ -1,7 +1,7 @@
 //! Output formatting for different data types
 
 use crate::cli::OutputFormat;
-use crate::discovery::{ServiceInfo, PodInfo, ServiceDescription, ServiceTopology};
+use crate::discovery::{ServiceInfo, PodInfo, ServiceDescription, ServiceTopology, IngressInfo};
 use crate::error::{ExplorerError, Result};
 use colored::*;
 use tabled::{Table, Tabled};
@@ -220,4 +220,46 @@ fn print_yaml<T: serde::Serialize + ?Sized>(data: &T) -> Result<()> {
         .map_err(|e| ExplorerError::OutputFormat(format!("YAML serialization failed: {}", e)))?;
     println!("{}", yaml);
     Ok(())
+}
+
+/// Print ingress information in the specified format
+pub fn print_ingress_info(ingress_routes: &[IngressInfo], format: &OutputFormat) -> Result<()> {
+    match format {
+        OutputFormat::Table => print_ingress_table(ingress_routes),
+        OutputFormat::Json => print_json(&ingress_routes)?,
+        OutputFormat::Yaml => print_yaml(&ingress_routes)?,
+    }
+    
+    Ok(())
+}
+
+fn print_ingress_table(ingress_routes: &[IngressInfo]) {
+    if ingress_routes.is_empty() {
+        return;
+    }
+    
+    println!("\nIngress Routes:");
+    for ingress in ingress_routes {
+        println!("  Ingress: {} (namespace: {})", ingress.name.cyan(), ingress.namespace);
+        
+        if !ingress.hosts.is_empty() {
+            println!("    Hosts: {}", ingress.hosts.join(", "));
+        }
+        
+        if ingress.tls_enabled {
+            println!("    TLS: {}", "Enabled".green());
+        }
+        
+        if !ingress.paths.is_empty() {
+            println!("    Paths:");
+            for path in &ingress.paths {
+                println!("      {} -> {}:{}", 
+                    path.path.yellow(), 
+                    path.service_name, 
+                    path.service_port
+                );
+            }
+        }
+        println!();
+    }
 }
