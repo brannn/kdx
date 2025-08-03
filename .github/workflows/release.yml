@@ -106,14 +106,27 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
 
     steps:
+    - name: Check if HOMEBREW_TAP_TOKEN is available
+      id: check_token
+      run: |
+        if [ -n "${{ secrets.HOMEBREW_TAP_TOKEN }}" ]; then
+          echo "token_available=true" >> $GITHUB_OUTPUT
+        else
+          echo "token_available=false" >> $GITHUB_OUTPUT
+          echo "HOMEBREW_TAP_TOKEN not set, skipping Homebrew formula update"
+          echo "To enable automatic Homebrew updates, create a Personal Access Token and add it as HOMEBREW_TAP_TOKEN secret"
+        fi
+
     - name: Checkout homebrew-kdx repository
+      if: steps.check_token.outputs.token_available == 'true'
       uses: actions/checkout@v4
       with:
         repository: brannn/homebrew-kdx
-        token: ${{ secrets.GITHUB_TOKEN }}
+        token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         path: homebrew-kdx
 
     - name: Get release information
+      if: steps.check_token.outputs.token_available == 'true'
       id: release_info
       run: |
         # Extract version from tag (remove 'v' prefix)
@@ -131,6 +144,7 @@ jobs:
         echo "linux_x86_64_sha=$LINUX_X86_64_SHA" >> $GITHUB_OUTPUT
 
     - name: Update Homebrew formula
+      if: steps.check_token.outputs.token_available == 'true'
       run: |
         cd homebrew-kdx
 
@@ -170,6 +184,7 @@ jobs:
         EOF
 
     - name: Commit and push changes
+      if: steps.check_token.outputs.token_available == 'true'
       run: |
         cd homebrew-kdx
         git config user.name "github-actions[bot]"
