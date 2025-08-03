@@ -8,6 +8,7 @@ A command-line tool for exploring and discovering resources in Kubernetes cluste
 - Pod Exploration: Find pods with flexible filtering options
 - Service Descriptions: Get detailed information about services and their relationships
 - Topology Analysis: Understand service topology and backend connections
+- Graph Visualization: Generate service dependency graphs in DOT and SVG formats
 - Multiple Output Formats: Table, JSON, and YAML output support
 - Namespace Filtering: Work with specific namespaces or across all namespaces
 - Ingress Discovery: Show which services are exposed via ingress
@@ -48,7 +49,11 @@ kdx describe grafana -n monitoring
 Show service topology:
 ```bash
 kdx topology grafana -n monitoring
-```
+
+Generate a service dependency graph:
+```bash
+kdx graph -n monitoring
+``````
 
 ### Output Formats
 
@@ -113,12 +118,39 @@ kdx describe api-service -n production
 kdx topology frontend -n web
 ```
 
+### Graph Visualization
+
+```bash
+# Generate basic service dependency graph
+kdx graph
+
+# Graph for specific namespace
+kdx graph -n production
+
+# Include pod relationships
+kdx graph --include-pods
+
+# Highlight specific service
+kdx graph --highlight=api-service
+
+# Generate SVG format
+kdx graph --format=svg
+
+# Save graph to file
+kdx graph -n monitoring > services.dot
+
+# Convert to PNG (requires Graphviz)
+kdx graph -n monitoring | dot -Tpng -o services.png
+
+# Convert to SVG (requires Graphviz)
+kdx graph -n monitoring | dot -Tsvg -o services.svg
+```
 ## Requirements
 
 - Kubernetes cluster access
 - Valid kubeconfig file
 - kubectl installed and configured
-
+- Graphviz (optional, for converting DOT graphs to PNG/SVG)
 ## Configuration
 
 kdx uses your existing kubectl configuration. Ensure you have:
