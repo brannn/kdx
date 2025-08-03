@@ -5,6 +5,9 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
 env:
   CARGO_TERM_COLOR: always
 
@@ -63,6 +66,8 @@ jobs:
       uses: softprops/action-gh-release@v2
       with:
         files: ${{ matrix.asset_name }}.tar.gz
+        tag_name: ${{ github.ref_name }}
+        name: kdx ${{ github.ref_name }}
         draft: false
         prerelease: false
         generate_release_notes: true
