@@ -162,6 +162,10 @@ impl DiscoveryEngine {
             pod_ip,
             node_name,
             labels: metadata.labels.unwrap_or_default(),
+            ready_containers: 0, // TODO: Calculate from container statuses
+            total_containers: 0, // TODO: Calculate from spec.containers
+            restart_count: 0,    // TODO: Calculate from container statuses
+            age: "Unknown".to_string(), // TODO: Calculate from creation timestamp
         })
     }
 }
@@ -192,6 +196,10 @@ pub struct PodInfo {
     pub pod_ip: Option<String>,
     pub node_name: Option<String>,
     pub labels: BTreeMap<String, String>,
+    pub ready_containers: u32,
+    pub total_containers: u32,
+    pub restart_count: u32,
+        pub age: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

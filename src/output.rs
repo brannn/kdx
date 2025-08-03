@@ -106,12 +106,17 @@ fn print_pods_table(pods: &[PodInfo]) {
         namespace: String,
         #[tabled(rename = "STATUS")]
         status: String,
+        #[tabled(rename = "READY")]
+        ready: String,
+        #[tabled(rename = "RESTARTS")]
+        restarts: u32,
+        #[tabled(rename = "AGE")]
+        age: String,
         #[tabled(rename = "IP")]
         ip: String,
         #[tabled(rename = "NODE")]
         node: String,
-    }
-    
+    }    
     let rows: Vec<PodRow> = pods.iter().map(|pod| {
         let status = match pod.phase.as_str() {
             "Running" => pod.phase.green().to_string(),
@@ -125,6 +130,9 @@ fn print_pods_table(pods: &[PodInfo]) {
             name: pod.name.clone(),
             namespace: pod.namespace.clone(),
             status,
+            ready: format!("{}/{}", pod.ready_containers, pod.total_containers),
+            restarts: pod.restart_count,
+            age: pod.age.clone(),
             ip: pod.pod_ip.clone().unwrap_or_else(|| "None".to_string()),
             node: pod.node_name.clone().unwrap_or_else(|| "None".to_string()),
         }
