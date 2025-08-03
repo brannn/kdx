@@ -465,7 +465,6 @@ pub struct ServiceTopology {
     pub dependencies: Vec<String>,   // TODO: Define proper dependency types
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -539,4 +538,5 @@ mod tests {
         assert_eq!(port.port, 80);
         assert_eq!(port.target_port, "8080");
         assert_eq!(port.protocol, "TCP");
-    }}
+    }
+}

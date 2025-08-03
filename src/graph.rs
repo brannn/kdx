@@ -243,7 +243,6 @@ pub async fn generate_service_graph(
     Ok(graph)
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -165,14 +165,25 @@ mod tests {
     #[test]
     fn test_cli_parsing_graph_with_options() {
         let cli = Cli::try_parse_from(&[
-            "kdx", "graph", 
-            "--namespace", "test", 
-            "--format", "svg",
+            "kdx",
+            "graph",
+            "--namespace",
+            "test",
+            "--format",
+            "svg",
             "--include-pods",
-            "--highlight", "nginx"
-        ]).unwrap();
-        
-        if let Commands::Graph { namespace, format, include_pods, highlight } = cli.command {
+            "--highlight",
+            "nginx",
+        ])
+        .unwrap();
+
+        if let Commands::Graph {
+            namespace,
+            format,
+            include_pods,
+            highlight,
+        } = cli.command
+        {
             assert_eq!(namespace, Some("test".to_string()));
             assert!(matches!(format, GraphFormat::Svg));
             assert!(include_pods);
@@ -185,10 +196,16 @@ mod tests {
     #[test]
     fn test_cli_global_options() {
         let cli = Cli::try_parse_from(&[
-            "kdx", "--verbose", "--output", "json", "--context", "test-context",
-            "services"
-        ]).unwrap();
-        
+            "kdx",
+            "--verbose",
+            "--output",
+            "json",
+            "--context",
+            "test-context",
+            "services",
+        ])
+        .unwrap();
+
         assert!(cli.verbose);
         assert!(matches!(cli.output, OutputFormat::Json));
         assert_eq!(cli.context, Some("test-context".to_string()));
