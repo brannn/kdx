@@ -44,6 +44,22 @@ The binary will be available at `target/release/kdx`.
 
 ## Usage
 
+
+## Quick Start
+
+```bash
+# List all services in current namespace
+kdx services
+
+# Explore a specific service
+kdx describe my-service
+
+# Visualize service dependencies
+kdx graph
+
+# Get help
+kdx --help
+```
 ### Basic Commands
 
 List all services in the default namespace:
@@ -159,6 +175,105 @@ kdx graph -n monitoring | dot -Tpng -o services.png
 
 # Convert to SVG (requires Graphviz)
 kdx graph -n monitoring | dot -Tsvg -o services.svg
+```
+
+## Example Output
+
+### Service Listing
+
+```bash
+$ kdx services -n production
+```
+
+```
++-------------+-----------+-------------+------------+-------+-----+
+| NAME        | NAMESPACE | TYPE        | CLUSTER-IP | PORTS | AGE |
++-------------+-----------+-------------+------------+-------+-----+
+| api-gateway | production| LoadBalancer| 10.0.1.100 | 80    | 5d  |
+| auth-service| production| ClusterIP   | 10.0.1.101 | 8080  | 5d  |
+| database    | production| ClusterIP   | 10.0.1.102 | 5432  | 10d |
+| redis-cache | production| ClusterIP   | 10.0.1.103 | 6379  | 8d  |
++-------------+-----------+-------------+------------+-------+-----+
+```
+
+### Service Description
+
+```bash
+$ kdx describe api-gateway -n production
+```
+
+```
+Service: api-gateway
+Namespace: production
+Type: LoadBalancer
+Cluster IP: 10.0.1.100
+External IP: 203.0.113.10
+
+Ports:
+  http 80:TCP -> 8080 (TCP)
+  https 443:TCP -> 8443 (TCP)
+
+Selector:
+  app = api-gateway
+  version = v1.2.3
+
+Related Pods:
++---------------------------+-----------+---------+-------+----------+-----+-------------+----------+
+| NAME                      | NAMESPACE | STATUS  | READY | RESTARTS | AGE | IP          | NODE     |
++---------------------------+-----------+---------+-------+----------+-----+-------------+----------+
+| api-gateway-7d4b8c9f-abc12| production| Running | 2/2   | 0        | 2d  | 10.244.1.15 | worker-1 |
+| api-gateway-7d4b8c9f-def34| production| Running | 2/2   | 0        | 2d  | 10.244.2.20 | worker-2 |
++---------------------------+-----------+---------+-------+----------+-----+-------------+----------+
+
+Ingress Routes:
+  https://api.example.com -> api-gateway:80
+  https://api.example.com/v2 -> api-gateway:80
+```
+
+### Graph Visualization
+
+```bash
+$ kdx graph -n production --highlight=api-gateway
+```
+
+```
+digraph services {
+  rankdir=LR;
+  
+  "api-gateway" [shape=box, style=filled, color=red, label="api-gateway\nproduction"];
+  "auth-service" [shape=box, style=filled, color=lightblue, label="auth-service\nproduction"];
+  "database" [shape=box, style=filled, color=lightblue, label="database\nproduction"];
+  
+  "ingress-nginx" [shape=diamond, style=filled, color=orange, label="ingress-nginx\ningress-nginx"];
+  
+  "ingress-nginx" -> "api-gateway" [style=bold, label="exposes"];
+  "api-gateway" -> "auth-service" [style=dashed, label="depends on"];
+  "auth-service" -> "database" [style=dashed, label="depends on"];
+}
+```
+
+### JSON Output
+
+```bash
+$ kdx services -n production --output=json
+```
+
+```json
+[
+  {
+    "name": "api-gateway",
+    "namespace": "production",
+    "type": "LoadBalancer",
+    "cluster_ip": "10.0.1.100",
+    "external_ips": ["203.0.113.10"],
+    "ports": [
+      {"name": "http", "port": 80, "target_port": "8080", "protocol": "TCP"},
+      {"name": "https", "port": 443, "target_port": "8443", "protocol": "TCP"}
+    ],
+    "selector": {"app": "api-gateway", "version": "v1.2.3"},
+    "age": "5d"
+  }
+]
 ```
 ## Requirements
 
