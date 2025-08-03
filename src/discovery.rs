@@ -203,6 +203,21 @@ pub struct PodInfo {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IngressInfo {
+    pub name: String,
+    pub namespace: String,
+    pub hosts: Vec<String>,
+    pub paths: Vec<IngressPath>,
+    pub tls_enabled: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IngressPath {
+    pub path: String,
+    pub service_name: String,
+    pub service_port: String,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServiceDescription {
     pub service: ServiceInfo,
     pub related_pods: Vec<PodInfo>,
