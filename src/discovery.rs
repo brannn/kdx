@@ -5,7 +5,7 @@ use k8s_openapi::api::core::v1::{Pod, Service};
 use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
 use kube::{Api, Client};
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, BTreeMap};
+use std::collections::BTreeMap;
 
 /// Main discovery engine for Kubernetes resources
 pub struct DiscoveryEngine {

@@ -7,8 +7,6 @@ pub enum ExplorerError {
     #[error("Kubernetes API error: {0}")]
     Kubernetes(#[from] kube::Error),
     
-    #[error("Configuration error: {0}")]
-    Config(String),
     
     #[error("Resource not found: {kind} '{name}' in namespace '{namespace}'")]
     ResourceNotFound {
@@ -17,8 +15,6 @@ pub enum ExplorerError {
         namespace: String,
     },
     
-    #[error("Invalid selector: {0}")]
-    InvalidSelector(String),
     
     #[error("Output formatting error: {0}")]
     OutputFormat(String),
