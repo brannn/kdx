@@ -97,7 +97,7 @@ pub enum Commands {
     },
 
     /// List statefulsets in the cluster
-    StatefulSets {
+    Statefulsets {
         /// Show statefulsets from a specific namespace
         #[clap(long, short = 'n')]
         namespace: Option<String>,
@@ -108,7 +108,7 @@ pub enum Commands {
     },
 
     /// List daemonsets in the cluster
-    DaemonSets {
+    Daemonsets {
         /// Show daemonsets from a specific namespace
         #[clap(long, short = 'n')]
         namespace: Option<String>,
@@ -119,7 +119,7 @@ pub enum Commands {
     },
 
     /// List configmaps in the cluster
-    ConfigMaps {
+    Configmaps {
         /// Show configmaps from a specific namespace
         #[clap(long, short = 'n')]
         namespace: Option<String>,

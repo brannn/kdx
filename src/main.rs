@@ -151,7 +151,7 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
                 output::print_deployments(&deployments, &cli.output)?;
             }
         }
-        Commands::StatefulSets {
+        Commands::Statefulsets {
             namespace,
             all_namespaces,
         } => {
@@ -164,7 +164,7 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
             let statefulsets = discovery.list_statefulsets(ns).await?;
             output::print_statefulsets(&statefulsets, &cli.output)?;
         }
-        Commands::DaemonSets {
+        Commands::Daemonsets {
             namespace,
             all_namespaces,
         } => {
@@ -177,7 +177,7 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
             let daemonsets = discovery.list_daemonsets(ns).await?;
             output::print_daemonsets(&daemonsets, &cli.output)?;
         }
-        Commands::ConfigMaps {
+        Commands::Configmaps {
             namespace,
             all_namespaces,
             selector,
