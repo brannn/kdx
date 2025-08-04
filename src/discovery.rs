@@ -288,7 +288,8 @@ impl DiscoveryEngine {
         }
 
         // Find associations with other resources
-        self.find_configmap_associations(&mut configmap_infos).await?;
+        self.find_configmap_associations(&mut configmap_infos)
+            .await?;
 
         Ok(configmap_infos)
     }
@@ -354,7 +355,8 @@ impl DiscoveryEngine {
         let plural = names.plural;
 
         // Get the preferred version (storage version)
-        let version = spec.versions
+        let version = spec
+            .versions
             .iter()
             .find(|v| v.storage)
             .or_else(|| spec.versions.first())
@@ -362,7 +364,9 @@ impl DiscoveryEngine {
             .unwrap_or_else(|| "v1".to_string());
 
         // Use dynamic client to list custom resources
-        let custom_resources = self.list_dynamic_resources(&group, &version, &plural, namespace).await?;
+        let custom_resources = self
+            .list_dynamic_resources(&group, &version, &plural, namespace)
+            .await?;
 
         Ok(custom_resources)
     }
@@ -541,9 +545,13 @@ impl DiscoveryEngine {
 
         let replicas = spec.replicas.unwrap_or(1);
         let ready_replicas = status.as_ref().and_then(|s| s.ready_replicas).unwrap_or(0);
-        let available_replicas = status.as_ref().and_then(|s| s.available_replicas).unwrap_or(0);
+        let available_replicas = status
+            .as_ref()
+            .and_then(|s| s.available_replicas)
+            .unwrap_or(0);
 
-        let strategy = spec.strategy
+        let strategy = spec
+            .strategy
             .as_ref()
             .and_then(|s| s.type_.as_ref())
             .unwrap_or(&"RollingUpdate".to_string())
@@ -564,7 +572,10 @@ impl DiscoveryEngine {
         })
     }
 
-    async fn convert_statefulset_to_info(&self, statefulset: StatefulSet) -> Option<StatefulSetInfo> {
+    async fn convert_statefulset_to_info(
+        &self,
+        statefulset: StatefulSet,
+    ) -> Option<StatefulSetInfo> {
         let metadata = statefulset.metadata;
         let spec = statefulset.spec?;
         let status = statefulset.status;
@@ -575,7 +586,10 @@ impl DiscoveryEngine {
 
         let replicas = spec.replicas.unwrap_or(1);
         let ready_replicas = status.as_ref().and_then(|s| s.ready_replicas).unwrap_or(0);
-        let current_replicas = status.as_ref().and_then(|s| s.current_replicas).unwrap_or(0);
+        let current_replicas = status
+            .as_ref()
+            .and_then(|s| s.current_replicas)
+            .unwrap_or(0);
 
         let selector = spec.selector.match_labels.unwrap_or_default();
 
@@ -600,10 +614,19 @@ impl DiscoveryEngine {
         let namespace = metadata.namespace.unwrap_or_else(|| "default".to_string());
         let labels = metadata.labels.unwrap_or_default();
 
-        let desired = status.as_ref().map(|s| s.desired_number_scheduled).unwrap_or(0);
-        let current = status.as_ref().map(|s| s.current_number_scheduled).unwrap_or(0);
+        let desired = status
+            .as_ref()
+            .map(|s| s.desired_number_scheduled)
+            .unwrap_or(0);
+        let current = status
+            .as_ref()
+            .map(|s| s.current_number_scheduled)
+            .unwrap_or(0);
         let ready = status.as_ref().map(|s| s.number_ready).unwrap_or(0);
-        let up_to_date = status.as_ref().and_then(|s| s.updated_number_scheduled).unwrap_or(0);
+        let up_to_date = status
+            .as_ref()
+            .and_then(|s| s.updated_number_scheduled)
+            .unwrap_or(0);
 
         let selector = spec.selector.match_labels.unwrap_or_default();
 
@@ -636,7 +659,7 @@ impl DiscoveryEngine {
             data_keys,
             age: "Unknown".to_string(), // TODO: Calculate from creation timestamp
             labels,
-            used_by: Vec::new(), // Will be populated by association finding
+            used_by: Vec::new(),     // Will be populated by association finding
             mount_paths: Vec::new(), // Will be populated by association finding
         })
     }
@@ -659,7 +682,7 @@ impl DiscoveryEngine {
             data_keys,
             age: "Unknown".to_string(), // TODO: Calculate from creation timestamp
             labels,
-            used_by: Vec::new(), // Will be populated by association finding
+            used_by: Vec::new(),     // Will be populated by association finding
             mount_paths: Vec::new(), // Will be populated by association finding
         })
     }
@@ -705,7 +728,11 @@ impl DiscoveryEngine {
             };
 
             // Only add if not already present
-            if !configmap.used_by.iter().any(|r| r.name == reference.name && r.kind == reference.kind) {
+            if !configmap
+                .used_by
+                .iter()
+                .any(|r| r.name == reference.name && r.kind == reference.kind)
+            {
                 configmap.used_by.push(reference);
             }
         }
@@ -726,7 +753,11 @@ impl DiscoveryEngine {
             };
 
             // Only add if not already present
-            if !secret.used_by.iter().any(|r| r.name == reference.name && r.kind == reference.kind) {
+            if !secret
+                .used_by
+                .iter()
+                .any(|r| r.name == reference.name && r.kind == reference.kind)
+            {
                 secret.used_by.push(reference);
             }
         }
@@ -746,7 +777,8 @@ impl DiscoveryEngine {
         let scope = spec.scope;
 
         // Get the preferred version (storage version)
-        let version = spec.versions
+        let version = spec
+            .versions
             .iter()
             .find(|v| v.storage)
             .or_else(|| spec.versions.first())
@@ -754,10 +786,12 @@ impl DiscoveryEngine {
             .unwrap_or_else(|| "v1".to_string());
 
         // Convert versions
-        let versions: Vec<CRDVersion> = spec.versions
+        let versions: Vec<CRDVersion> = spec
+            .versions
             .into_iter()
             .map(|v| {
-                let schema_properties = v.schema
+                let schema_properties = v
+                    .schema
                     .and_then(|s| s.open_api_v3_schema)
                     .and_then(|schema| schema.properties)
                     .map(|props| props.keys().cloned().collect())
@@ -798,10 +832,10 @@ impl DiscoveryEngine {
 
     async fn list_dynamic_resources(
         &self,
-        group: &str,
-        version: &str,
-        plural: &str,
-        namespace: Option<&str>,
+        _group: &str,
+        _version: &str,
+        _plural: &str,
+        _namespace: Option<&str>,
     ) -> Result<Vec<CustomResourceInfo>> {
         // This is a simplified implementation
         // In a real implementation, we would use kube::discovery and dynamic client
@@ -973,7 +1007,7 @@ pub struct CustomResourceInfo {
     pub age: String,
     pub labels: BTreeMap<String, String>,
     pub annotations: BTreeMap<String, String>,
-    pub spec_summary: String, // Simplified representation of spec
+    pub spec_summary: String,           // Simplified representation of spec
     pub status_summary: Option<String>, // Simplified representation of status
     pub related_resources: Vec<ResourceReference>,
 }
@@ -1161,7 +1195,10 @@ mod tests {
         assert_eq!(daemonset.ready, 4);
         assert_eq!(daemonset.up_to_date, 5);
         assert_eq!(daemonset.age, "30d");
-        assert_eq!(daemonset.labels.get("component"), Some(&"agent".to_string()));
+        assert_eq!(
+            daemonset.labels.get("component"),
+            Some(&"agent".to_string())
+        );
     }
 
     #[test]
@@ -1185,7 +1222,8 @@ mod tests {
         assert!(json.contains("RollingUpdate"));
 
         // Test deserialization
-        let deserialized: DeploymentInfo = serde_json::from_str(&json).expect("Failed to deserialize from JSON");
+        let deserialized: DeploymentInfo =
+            serde_json::from_str(&json).expect("Failed to deserialize from JSON");
         assert_eq!(deserialized.name, deployment.name);
         assert_eq!(deserialized.replicas, deployment.replicas);
     }
@@ -1230,7 +1268,10 @@ mod tests {
 
         assert_eq!(statefulset.labels.len(), 4);
         assert_eq!(statefulset.labels.get("tier"), Some(&"web".to_string()));
-        assert_eq!(statefulset.labels.get("environment"), Some(&"staging".to_string()));
+        assert_eq!(
+            statefulset.labels.get("environment"),
+            Some(&"staging".to_string())
+        );
         assert_eq!(statefulset.selector.len(), 4);
     }
 }

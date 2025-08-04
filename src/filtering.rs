@@ -1,9 +1,12 @@
 //! Advanced filtering and grouping capabilities for Kubernetes resources
 
-use crate::discovery::{ConfigMapInfo, CRDInfo, CustomResourceInfo, DaemonSetInfo, DeploymentInfo, PodInfo, SecretInfo, ServiceInfo, StatefulSetInfo};
+use crate::discovery::{
+    CRDInfo, ConfigMapInfo, CustomResourceInfo, DaemonSetInfo, DeploymentInfo, PodInfo, SecretInfo,
+    ServiceInfo, StatefulSetInfo,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
 /// Filter criteria for resources
 #[derive(Debug, Clone, Default)]
@@ -13,12 +16,16 @@ pub struct FilterCriteria {
     /// Status filter (Running, Pending, Failed, etc.)
     pub status_filter: Option<String>,
     /// Age filter - resources newer than this duration
+    #[allow(dead_code)]
     pub newer_than: Option<Duration>,
     /// Age filter - resources older than this duration
+    #[allow(dead_code)]
     pub older_than: Option<Duration>,
     /// Resource type inclusion filter
+    #[allow(dead_code)]
     pub include_types: Vec<String>,
     /// Resource type exclusion filter
+    #[allow(dead_code)]
     pub exclude_types: Vec<String>,
 }
 
@@ -150,8 +157,8 @@ impl LabelSelector {
                 LabelExpression::Equals(key.to_string(), value.to_string())
             } else {
                 // Existence check
-                if expr.starts_with('!') {
-                    LabelExpression::NotExists(expr[1..].to_string())
+                if let Some(stripped) = expr.strip_prefix('!') {
+                    LabelExpression::NotExists(stripped.to_string())
                 } else {
                     LabelExpression::Exists(expr.to_string())
                 }
@@ -217,10 +224,13 @@ impl LabelSelector {
 
         // Parse (value1,value2,value3) format
         if !values_str.starts_with('(') || !values_str.ends_with(')') {
-            return Err(format!("Values must be in parentheses: '{}' (full expression: '{}')", values_str, expr));
+            return Err(format!(
+                "Values must be in parentheses: '{}' (full expression: '{}')",
+                values_str, expr
+            ));
         }
 
-        let values_inner = &values_str[1..values_str.len()-1];
+        let values_inner = &values_str[1..values_str.len() - 1];
         let values: Vec<String> = values_inner
             .split(',')
             .map(|v| v.trim().to_string())
@@ -241,17 +251,11 @@ impl LabelSelector {
     /// Evaluate the selector against a set of labels
     pub fn matches(&self, labels: &BTreeMap<String, String>) -> bool {
         self.expressions.iter().all(|expr| match expr {
-            LabelExpression::Equals(key, value) => {
-                labels.get(key).map_or(false, |v| v == value)
-            }
-            LabelExpression::NotEquals(key, value) => {
-                labels.get(key).map_or(true, |v| v != value)
-            }
-            LabelExpression::In(key, values) => {
-                labels.get(key).map_or(false, |v| values.contains(v))
-            }
+            LabelExpression::Equals(key, value) => labels.get(key) == Some(value),
+            LabelExpression::NotEquals(key, value) => labels.get(key) != Some(value),
+            LabelExpression::In(key, values) => labels.get(key).is_some_and(|v| values.contains(v)),
             LabelExpression::NotIn(key, values) => {
-                labels.get(key).map_or(true, |v| !values.contains(v))
+                labels.get(key).is_none_or(|v| !values.contains(v))
             }
             LabelExpression::Exists(key) => labels.contains_key(key),
             LabelExpression::NotExists(key) => !labels.contains_key(key),
@@ -442,7 +446,10 @@ impl ResourceFilter {
         true
     }
 
-    fn matches_custom_resource_criteria(cr: &CustomResourceInfo, criteria: &FilterCriteria) -> bool {
+    fn matches_custom_resource_criteria(
+        cr: &CustomResourceInfo,
+        criteria: &FilterCriteria,
+    ) -> bool {
         // Label selector check
         if let Some(selector_str) = &criteria.label_selector {
             if let Ok(selector) = LabelSelector::parse(selector_str) {
@@ -475,19 +482,57 @@ impl ResourceGrouper {
 
         match group_by {
             GroupBy::App => {
-                Self::group_by_label(&mut groups, services, pods, deployments, statefulsets, daemonsets, "app");
+                Self::group_by_label(
+                    &mut groups,
+                    services,
+                    pods,
+                    deployments,
+                    statefulsets,
+                    daemonsets,
+                    "app",
+                );
             }
             GroupBy::Tier => {
-                Self::group_by_label(&mut groups, services, pods, deployments, statefulsets, daemonsets, "tier");
+                Self::group_by_label(
+                    &mut groups,
+                    services,
+                    pods,
+                    deployments,
+                    statefulsets,
+                    daemonsets,
+                    "tier",
+                );
             }
             GroupBy::HelmRelease => {
-                Self::group_by_helm_release(&mut groups, services, pods, deployments, statefulsets, daemonsets);
+                Self::group_by_helm_release(
+                    &mut groups,
+                    services,
+                    pods,
+                    deployments,
+                    statefulsets,
+                    daemonsets,
+                );
             }
             GroupBy::Namespace => {
-                Self::group_by_namespace(&mut groups, services, pods, deployments, statefulsets, daemonsets);
+                Self::group_by_namespace(
+                    &mut groups,
+                    services,
+                    pods,
+                    deployments,
+                    statefulsets,
+                    daemonsets,
+                );
             }
             GroupBy::CustomLabel(label_key) => {
-                Self::group_by_label(&mut groups, services, pods, deployments, statefulsets, daemonsets, label_key);
+                Self::group_by_label(
+                    &mut groups,
+                    services,
+                    pods,
+                    deployments,
+                    statefulsets,
+                    daemonsets,
+                    label_key,
+                );
             }
             GroupBy::None => {
                 let mut group = ResourceGroup::new("All Resources".to_string(), "none".to_string());
@@ -504,7 +549,10 @@ impl ResourceGrouper {
     }
 
     /// Group configmaps by the specified criteria
-    pub fn group_configmaps(configmaps: Vec<ConfigMapInfo>, group_by: &GroupBy) -> GroupedResources {
+    pub fn group_configmaps(
+        configmaps: Vec<ConfigMapInfo>,
+        group_by: &GroupBy,
+    ) -> GroupedResources {
         let mut groups = BTreeMap::new();
 
         match group_by {
@@ -515,7 +563,11 @@ impl ResourceGrouper {
                 Self::group_configmaps_by_label(&mut groups, configmaps, "tier");
             }
             GroupBy::HelmRelease => {
-                Self::group_configmaps_by_label(&mut groups, configmaps, "app.kubernetes.io/instance");
+                Self::group_configmaps_by_label(
+                    &mut groups,
+                    configmaps,
+                    "app.kubernetes.io/instance",
+                );
             }
             GroupBy::Namespace => {
                 Self::group_configmaps_by_namespace(&mut groups, configmaps);
@@ -524,7 +576,7 @@ impl ResourceGrouper {
                 Self::group_configmaps_by_label(&mut groups, configmaps, label_key);
             }
             GroupBy::None => {
-                let mut group = ResourceGroup::new("All ConfigMaps".to_string(), "none".to_string());
+                let group = ResourceGroup::new("All ConfigMaps".to_string(), "none".to_string());
                 // Note: We'd need to extend ResourceGroup to include configmaps field
                 groups.insert("all".to_string(), group);
             }
@@ -554,7 +606,7 @@ impl ResourceGrouper {
                 Self::group_secrets_by_label(&mut groups, secrets, label_key);
             }
             GroupBy::None => {
-                let mut group = ResourceGroup::new("All Secrets".to_string(), "none".to_string());
+                let group = ResourceGroup::new("All Secrets".to_string(), "none".to_string());
                 // Note: We'd need to extend ResourceGroup to include secrets field
                 groups.insert("all".to_string(), group);
             }
@@ -585,7 +637,7 @@ impl ResourceGrouper {
                 Self::group_crds_by_label(&mut groups, crds, label_key);
             }
             GroupBy::None => {
-                let mut group = ResourceGroup::new("All CRDs".to_string(), "none".to_string());
+                let group = ResourceGroup::new("All CRDs".to_string(), "none".to_string());
                 // Note: We'd need to extend ResourceGroup to include crds field
                 groups.insert("all".to_string(), group);
             }
@@ -595,7 +647,10 @@ impl ResourceGrouper {
     }
 
     /// Group custom resources by the specified criteria
-    pub fn group_custom_resources(custom_resources: Vec<CustomResourceInfo>, group_by: &GroupBy) -> GroupedResources {
+    pub fn group_custom_resources(
+        custom_resources: Vec<CustomResourceInfo>,
+        group_by: &GroupBy,
+    ) -> GroupedResources {
         let mut groups = BTreeMap::new();
 
         match group_by {
@@ -606,7 +661,11 @@ impl ResourceGrouper {
                 Self::group_custom_resources_by_label(&mut groups, custom_resources, "tier");
             }
             GroupBy::HelmRelease => {
-                Self::group_custom_resources_by_label(&mut groups, custom_resources, "app.kubernetes.io/instance");
+                Self::group_custom_resources_by_label(
+                    &mut groups,
+                    custom_resources,
+                    "app.kubernetes.io/instance",
+                );
             }
             GroupBy::Namespace => {
                 Self::group_custom_resources_by_namespace(&mut groups, custom_resources);
@@ -615,7 +674,8 @@ impl ResourceGrouper {
                 Self::group_custom_resources_by_label(&mut groups, custom_resources, label_key);
             }
             GroupBy::None => {
-                let mut group = ResourceGroup::new("All Custom Resources".to_string(), "none".to_string());
+                let group =
+                    ResourceGroup::new("All Custom Resources".to_string(), "none".to_string());
                 // Note: We'd need to extend ResourceGroup to include custom_resources field
                 groups.insert("all".to_string(), group);
             }
@@ -641,7 +701,7 @@ impl ResourceGrouper {
                 .and_then(|labels| labels.get(label_key))
                 .unwrap_or(&"unknown".to_string())
                 .clone();
-            
+
             let group = groups
                 .entry(group_name.clone())
                 .or_insert_with(|| ResourceGroup::new(group_name, label_key.to_string()));
@@ -655,7 +715,7 @@ impl ResourceGrouper {
                 .get(label_key)
                 .unwrap_or(&"unknown".to_string())
                 .clone();
-            
+
             let group = groups
                 .entry(group_name.clone())
                 .or_insert_with(|| ResourceGroup::new(group_name, label_key.to_string()));
@@ -669,7 +729,7 @@ impl ResourceGrouper {
                 .get(label_key)
                 .unwrap_or(&"unknown".to_string())
                 .clone();
-            
+
             let group = groups
                 .entry(group_name.clone())
                 .or_insert_with(|| ResourceGroup::new(group_name, label_key.to_string()));
@@ -682,7 +742,7 @@ impl ResourceGrouper {
                 .get(label_key)
                 .unwrap_or(&"unknown".to_string())
                 .clone();
-            
+
             let group = groups
                 .entry(group_name.clone())
                 .or_insert_with(|| ResourceGroup::new(group_name, label_key.to_string()));
@@ -695,7 +755,7 @@ impl ResourceGrouper {
                 .get(label_key)
                 .unwrap_or(&"unknown".to_string())
                 .clone();
-            
+
             let group = groups
                 .entry(group_name.clone())
                 .or_insert_with(|| ResourceGroup::new(group_name, label_key.to_string()));
@@ -713,13 +773,24 @@ impl ResourceGrouper {
     ) {
         // Helm releases are identified by specific labels
         const HELM_RELEASE_LABEL: &str = "app.kubernetes.io/instance";
+        #[allow(dead_code)]
         const HELM_MANAGED_BY_LABEL: &str = "app.kubernetes.io/managed-by";
 
-        Self::group_by_label(groups, services, pods, deployments, statefulsets, daemonsets, HELM_RELEASE_LABEL);
+        Self::group_by_label(
+            groups,
+            services,
+            pods,
+            deployments,
+            statefulsets,
+            daemonsets,
+            HELM_RELEASE_LABEL,
+        );
 
         // Add Helm metadata to groups
         for group in groups.values_mut() {
-            group.metadata.insert("managed-by".to_string(), "Helm".to_string());
+            group
+                .metadata
+                .insert("managed-by".to_string(), "Helm".to_string());
         }
     }
 
@@ -733,37 +804,43 @@ impl ResourceGrouper {
     ) {
         // Group by namespace
         for service in services {
-            let group = groups
-                .entry(service.namespace.clone())
-                .or_insert_with(|| ResourceGroup::new(service.namespace.clone(), "namespace".to_string()));
+            let group = groups.entry(service.namespace.clone()).or_insert_with(|| {
+                ResourceGroup::new(service.namespace.clone(), "namespace".to_string())
+            });
             group.services.push(service);
         }
 
         for deployment in deployments {
             let group = groups
                 .entry(deployment.namespace.clone())
-                .or_insert_with(|| ResourceGroup::new(deployment.namespace.clone(), "namespace".to_string()));
+                .or_insert_with(|| {
+                    ResourceGroup::new(deployment.namespace.clone(), "namespace".to_string())
+                });
             group.deployments.push(deployment);
         }
 
         for pod in pods {
-            let group = groups
-                .entry(pod.namespace.clone())
-                .or_insert_with(|| ResourceGroup::new(pod.namespace.clone(), "namespace".to_string()));
+            let group = groups.entry(pod.namespace.clone()).or_insert_with(|| {
+                ResourceGroup::new(pod.namespace.clone(), "namespace".to_string())
+            });
             group.pods.push(pod);
         }
 
         for statefulset in statefulsets {
             let group = groups
                 .entry(statefulset.namespace.clone())
-                .or_insert_with(|| ResourceGroup::new(statefulset.namespace.clone(), "namespace".to_string()));
+                .or_insert_with(|| {
+                    ResourceGroup::new(statefulset.namespace.clone(), "namespace".to_string())
+                });
             group.statefulsets.push(statefulset);
         }
 
         for daemonset in daemonsets {
             let group = groups
                 .entry(daemonset.namespace.clone())
-                .or_insert_with(|| ResourceGroup::new(daemonset.namespace.clone(), "namespace".to_string()));
+                .or_insert_with(|| {
+                    ResourceGroup::new(daemonset.namespace.clone(), "namespace".to_string())
+                });
             group.daemonsets.push(daemonset);
         }
     }
@@ -794,7 +871,9 @@ impl ResourceGrouper {
         for configmap in configmaps {
             let group = groups
                 .entry(configmap.namespace.clone())
-                .or_insert_with(|| ResourceGroup::new(configmap.namespace.clone(), "namespace".to_string()));
+                .or_insert_with(|| {
+                    ResourceGroup::new(configmap.namespace.clone(), "namespace".to_string())
+                });
             group.configmaps.push(configmap);
         }
     }
@@ -823,9 +902,9 @@ impl ResourceGrouper {
         secrets: Vec<SecretInfo>,
     ) {
         for secret in secrets {
-            let group = groups
-                .entry(secret.namespace.clone())
-                .or_insert_with(|| ResourceGroup::new(secret.namespace.clone(), "namespace".to_string()));
+            let group = groups.entry(secret.namespace.clone()).or_insert_with(|| {
+                ResourceGroup::new(secret.namespace.clone(), "namespace".to_string())
+            });
             group.secrets.push(secret);
         }
     }
@@ -849,10 +928,7 @@ impl ResourceGrouper {
         }
     }
 
-    fn group_crds_by_scope(
-        groups: &mut BTreeMap<String, ResourceGroup>,
-        crds: Vec<CRDInfo>,
-    ) {
+    fn group_crds_by_scope(groups: &mut BTreeMap<String, ResourceGroup>, crds: Vec<CRDInfo>) {
         for crd in crds {
             let group = groups
                 .entry(crd.scope.clone())
@@ -885,7 +961,10 @@ impl ResourceGrouper {
         custom_resources: Vec<CustomResourceInfo>,
     ) {
         for cr in custom_resources {
-            let namespace = cr.namespace.clone().unwrap_or_else(|| "cluster".to_string());
+            let namespace = cr
+                .namespace
+                .clone()
+                .unwrap_or_else(|| "cluster".to_string());
             let group = groups
                 .entry(namespace.clone())
                 .or_insert_with(|| ResourceGroup::new(namespace, "namespace".to_string()));
@@ -985,7 +1064,9 @@ mod tests {
 
     #[test]
     fn test_label_selector_multiple_expressions() {
-        let selector = LabelSelector::parse("app=web,tier=frontend,environment in (production,staging)").unwrap();
+        let selector =
+            LabelSelector::parse("app=web,tier=frontend,environment in (production,staging)")
+                .unwrap();
         let labels = create_test_labels();
 
         assert!(selector.matches(&labels));
@@ -1051,13 +1132,14 @@ mod tests {
         assert!(json.contains("app"));
 
         // Test deserialization
-        let deserialized: GroupedResources = serde_json::from_str(&json).expect("Failed to deserialize from JSON");
+        let deserialized: GroupedResources =
+            serde_json::from_str(&json).expect("Failed to deserialize from JSON");
         assert!(deserialized.groups.contains_key("web"));
     }
 
     #[test]
     fn test_filter_configmaps() {
-        use crate::discovery::{ConfigMapInfo, ResourceReference, ReferenceType};
+        use crate::discovery::{ConfigMapInfo, ReferenceType, ResourceReference};
 
         let mut labels = BTreeMap::new();
         labels.insert("app".to_string(), "web".to_string());
@@ -1099,7 +1181,7 @@ mod tests {
 
     #[test]
     fn test_filter_secrets() {
-        use crate::discovery::{SecretInfo, ResourceReference, ReferenceType};
+        use crate::discovery::{ReferenceType, ResourceReference, SecretInfo};
 
         let mut labels = BTreeMap::new();
         labels.insert("app".to_string(), "database".to_string());
@@ -1229,10 +1311,14 @@ mod tests {
         let env_from = ReferenceType::EnvironmentFrom;
         let image_pull = ReferenceType::ImagePullSecret;
 
-        let json_vm = serde_json::to_string(&volume_mount).expect("Failed to serialize VolumeMount");
-        let json_env = serde_json::to_string(&environment).expect("Failed to serialize Environment");
-        let json_envfrom = serde_json::to_string(&env_from).expect("Failed to serialize EnvironmentFrom");
-        let json_imgpull = serde_json::to_string(&image_pull).expect("Failed to serialize ImagePullSecret");
+        let json_vm =
+            serde_json::to_string(&volume_mount).expect("Failed to serialize VolumeMount");
+        let json_env =
+            serde_json::to_string(&environment).expect("Failed to serialize Environment");
+        let json_envfrom =
+            serde_json::to_string(&env_from).expect("Failed to serialize EnvironmentFrom");
+        let json_imgpull =
+            serde_json::to_string(&image_pull).expect("Failed to serialize ImagePullSecret");
 
         assert!(json_vm.contains("VolumeMount"));
         assert!(json_env.contains("Environment"));
@@ -1288,14 +1374,17 @@ mod tests {
 
     #[test]
     fn test_filter_custom_resources() {
-        use crate::discovery::{CustomResourceInfo, ResourceReference, ReferenceType};
+        use crate::discovery::{CustomResourceInfo, ReferenceType, ResourceReference};
 
         let mut labels = BTreeMap::new();
         labels.insert("app".to_string(), "prometheus".to_string());
         labels.insert("instance".to_string(), "main".to_string());
 
         let mut annotations = BTreeMap::new();
-        annotations.insert("kubectl.kubernetes.io/last-applied-configuration".to_string(), "{}".to_string());
+        annotations.insert(
+            "kubectl.kubernetes.io/last-applied-configuration".to_string(),
+            "{}".to_string(),
+        );
 
         let custom_resource = CustomResourceInfo {
             name: "prometheus-main".to_string(),
@@ -1419,7 +1508,8 @@ mod tests {
             },
         ];
 
-        let grouped = ResourceGrouper::group_custom_resources(custom_resources, &GroupBy::Namespace);
+        let grouped =
+            ResourceGrouper::group_custom_resources(custom_resources, &GroupBy::Namespace);
 
         assert_eq!(grouped.groups.len(), 2);
         assert!(grouped.groups.contains_key("monitoring"));
@@ -1442,7 +1532,11 @@ mod tests {
             name: "v1".to_string(),
             served: true,
             storage: true,
-            schema_properties: vec!["spec".to_string(), "status".to_string(), "metadata".to_string()],
+            schema_properties: vec![
+                "spec".to_string(),
+                "status".to_string(),
+                "metadata".to_string(),
+            ],
         };
 
         // Test JSON serialization
@@ -1452,7 +1546,8 @@ mod tests {
         assert!(json.contains("spec"));
 
         // Test deserialization
-        let deserialized: CRDVersion = serde_json::from_str(&json).expect("Failed to deserialize CRDVersion");
+        let deserialized: CRDVersion =
+            serde_json::from_str(&json).expect("Failed to deserialize CRDVersion");
         assert_eq!(deserialized.name, "v1");
         assert!(deserialized.served);
         assert!(deserialized.storage);
@@ -1495,7 +1590,10 @@ mod tests {
         assert_eq!(crd.versions.len(), 2);
         assert_eq!(crd.version, "v1"); // Should be the storage version
         assert!(crd.versions.iter().any(|v| v.storage && v.name == "v1"));
-        assert!(crd.versions.iter().any(|v| !v.storage && v.name == "v1beta1"));
+        assert!(crd
+            .versions
+            .iter()
+            .any(|v| !v.storage && v.name == "v1beta1"));
         assert_eq!(crd.instance_count, 10);
     }
 }

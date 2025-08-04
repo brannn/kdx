@@ -2,11 +2,12 @@
 
 use crate::cli::OutputFormat;
 use crate::discovery::{
-    ConfigMapInfo, CRDInfo, CustomResourceInfo, DaemonSetInfo, DeploymentInfo, IngressInfo, PodInfo, SecretInfo,
-    ServiceDescription, ServiceHealth, ServiceInfo, ServiceTopology, StatefulSetInfo,
+    CRDInfo, ConfigMapInfo, CustomResourceInfo, DaemonSetInfo, DeploymentInfo, IngressInfo,
+    PodInfo, SecretInfo, ServiceDescription, ServiceHealth, ServiceInfo, ServiceTopology,
+    StatefulSetInfo,
 };
-use crate::filtering::GroupedResources;
 use crate::error::{ExplorerError, Result};
+use crate::filtering::GroupedResources;
 use colored::*;
 use tabled::{Table, Tabled};
 
@@ -151,7 +152,10 @@ pub fn print_crds(crds: &[CRDInfo], format: &OutputFormat, show_versions: bool) 
 }
 
 /// Print custom resources in the specified format
-pub fn print_custom_resources(custom_resources: &[CustomResourceInfo], format: &OutputFormat) -> Result<()> {
+pub fn print_custom_resources(
+    custom_resources: &[CustomResourceInfo],
+    format: &OutputFormat,
+) -> Result<()> {
     if custom_resources.is_empty() {
         println!("No custom resources found");
         return Ok(());
@@ -167,7 +171,11 @@ pub fn print_custom_resources(custom_resources: &[CustomResourceInfo], format: &
 }
 
 /// Print grouped CRDs in the specified format
-pub fn print_grouped_crds(grouped: &GroupedResources, format: &OutputFormat, show_versions: bool) -> Result<()> {
+pub fn print_grouped_crds(
+    grouped: &GroupedResources,
+    format: &OutputFormat,
+    show_versions: bool,
+) -> Result<()> {
     match format {
         OutputFormat::Table => print_grouped_crds_table(grouped, show_versions),
         OutputFormat::Json => print_json(&grouped)?,
@@ -178,7 +186,10 @@ pub fn print_grouped_crds(grouped: &GroupedResources, format: &OutputFormat, sho
 }
 
 /// Print grouped custom resources in the specified format
-pub fn print_grouped_custom_resources(grouped: &GroupedResources, format: &OutputFormat) -> Result<()> {
+pub fn print_grouped_custom_resources(
+    grouped: &GroupedResources,
+    format: &OutputFormat,
+) -> Result<()> {
     match format {
         OutputFormat::Table => print_grouped_custom_resources_table(grouped),
         OutputFormat::Json => print_json(&grouped)?,
@@ -755,7 +766,10 @@ fn print_secrets_table(secrets: &[SecretInfo]) {
 
 fn print_grouped_configmaps_table(grouped: &GroupedResources) {
     for (group_name, group) in &grouped.groups {
-        println!("\n=== ConfigMap Group: {} ({}) ===", group_name, group.group_type);
+        println!(
+            "\n=== ConfigMap Group: {} ({}) ===",
+            group_name, group.group_type
+        );
 
         if !group.configmaps.is_empty() {
             print_configmaps_table(&group.configmaps);
@@ -769,7 +783,10 @@ fn print_grouped_configmaps_table(grouped: &GroupedResources) {
 
 fn print_grouped_secrets_table(grouped: &GroupedResources) {
     for (group_name, group) in &grouped.groups {
-        println!("\n=== Secret Group: {} ({}) ===", group_name, group.group_type);
+        println!(
+            "\n=== Secret Group: {} ({}) ===",
+            group_name, group.group_type
+        );
 
         if !group.secrets.is_empty() {
             print_secrets_table(&group.secrets);
@@ -864,7 +881,10 @@ fn print_custom_resources_table(custom_resources: &[CustomResourceInfo]) {
         .iter()
         .map(|cr| CustomResourceRow {
             name: cr.name.clone(),
-            namespace: cr.namespace.clone().unwrap_or_else(|| "cluster".to_string()),
+            namespace: cr
+                .namespace
+                .clone()
+                .unwrap_or_else(|| "cluster".to_string()),
             kind: cr.kind.clone(),
             version: cr.version.clone(),
             age: cr.age.clone(),
@@ -891,7 +911,10 @@ fn print_grouped_crds_table(grouped: &GroupedResources, show_versions: bool) {
 
 fn print_grouped_custom_resources_table(grouped: &GroupedResources) {
     for (group_name, group) in &grouped.groups {
-        println!("\n=== Custom Resource Group: {} ({}) ===", group_name, group.group_type);
+        println!(
+            "\n=== Custom Resource Group: {} ({}) ===",
+            group_name, group.group_type
+        );
 
         if !group.custom_resources.is_empty() {
             print_custom_resources_table(&group.custom_resources);
@@ -899,7 +922,10 @@ fn print_grouped_custom_resources_table(grouped: &GroupedResources) {
             println!("No custom resources in this group");
         }
 
-        println!("Total custom resources in group: {}", group.custom_resources.len());
+        println!(
+            "Total custom resources in group: {}",
+            group.custom_resources.len()
+        );
     }
 }
 
@@ -1053,16 +1079,13 @@ mod tests {
 
     #[test]
     fn test_multiple_deployments_output() {
-        let deployments = vec![
-            create_test_deployment(),
-            {
-                let mut deployment = create_test_deployment();
-                deployment.name = "second-deployment".to_string();
-                deployment.namespace = "production".to_string();
-                deployment.replicas = 5;
-                deployment
-            }
-        ];
+        let deployments = vec![create_test_deployment(), {
+            let mut deployment = create_test_deployment();
+            deployment.name = "second-deployment".to_string();
+            deployment.namespace = "production".to_string();
+            deployment.replicas = 5;
+            deployment
+        }];
 
         // Test all output formats with multiple deployments
         assert!(print_deployments(&deployments, &OutputFormat::Table).is_ok());

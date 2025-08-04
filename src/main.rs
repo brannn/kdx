@@ -76,7 +76,12 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
             if let Some(group_by_str) = group_by {
                 let group_by = parse_group_by(&group_by_str);
                 let grouped = ResourceGrouper::group_resources(
-                    services, vec![], vec![], vec![], vec![], &group_by
+                    services,
+                    vec![],
+                    vec![],
+                    vec![],
+                    vec![],
+                    &group_by,
                 );
                 output::print_grouped_resources(&grouped, &cli.output)?;
             } else {
@@ -110,7 +115,12 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
             if let Some(group_by_str) = group_by {
                 let group_by = parse_group_by(&group_by_str);
                 let grouped = ResourceGrouper::group_resources(
-                    vec![], pods, vec![], vec![], vec![], &group_by
+                    vec![],
+                    pods,
+                    vec![],
+                    vec![],
+                    vec![],
+                    &group_by,
                 );
                 output::print_grouped_resources(&grouped, &cli.output)?;
             } else {
@@ -144,7 +154,12 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
             if let Some(group_by_str) = group_by {
                 let group_by = parse_group_by(&group_by_str);
                 let grouped = ResourceGrouper::group_resources(
-                    vec![], vec![], deployments, vec![], vec![], &group_by
+                    vec![],
+                    vec![],
+                    deployments,
+                    vec![],
+                    vec![],
+                    &group_by,
                 );
                 output::print_grouped_resources(&grouped, &cli.output)?;
             } else {
@@ -201,7 +216,7 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
 
             // Filter for unused if requested
             if unused {
-                configmaps = configmaps.into_iter().filter(|cm| cm.used_by.is_empty()).collect();
+                configmaps.retain(|cm| cm.used_by.is_empty());
             }
 
             // Apply grouping if specified
@@ -238,12 +253,12 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
 
             // Filter by secret type if specified
             if let Some(stype) = secret_type {
-                secrets = secrets.into_iter().filter(|s| s.secret_type == stype).collect();
+                secrets.retain(|s| s.secret_type == stype);
             }
 
             // Filter for unused if requested
             if unused {
-                secrets = secrets.into_iter().filter(|s| s.used_by.is_empty()).collect();
+                secrets.retain(|s| s.used_by.is_empty());
             }
 
             // Apply grouping if specified
@@ -272,7 +287,7 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
 
             // Filter for CRDs with instances if requested
             if with_instances {
-                crds = crds.into_iter().filter(|crd| crd.instance_count > 0).collect();
+                crds.retain(|crd| crd.instance_count > 0);
             }
 
             // Apply grouping if specified
