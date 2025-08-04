@@ -1,6 +1,6 @@
 //! Advanced filtering and grouping capabilities for Kubernetes resources
 
-use crate::discovery::{DaemonSetInfo, DeploymentInfo, PodInfo, ServiceInfo, StatefulSetInfo};
+use crate::discovery::{ConfigMapInfo, DaemonSetInfo, DeploymentInfo, PodInfo, SecretInfo, ServiceInfo, StatefulSetInfo};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -55,6 +55,8 @@ pub struct ResourceGroup {
     pub deployments: Vec<DeploymentInfo>,
     pub statefulsets: Vec<StatefulSetInfo>,
     pub daemonsets: Vec<DaemonSetInfo>,
+    pub configmaps: Vec<ConfigMapInfo>,
+    pub secrets: Vec<SecretInfo>,
     pub metadata: BTreeMap<String, String>,
 }
 
@@ -68,6 +70,8 @@ impl ResourceGroup {
             deployments: Vec::new(),
             statefulsets: Vec::new(),
             daemonsets: Vec::new(),
+            configmaps: Vec::new(),
+            secrets: Vec::new(),
             metadata: BTreeMap::new(),
         }
     }
@@ -78,6 +82,8 @@ impl ResourceGroup {
             + self.deployments.len()
             + self.statefulsets.len()
             + self.daemonsets.len()
+            + self.configmaps.len()
+            + self.secrets.len()
     }
 }
 
@@ -280,6 +286,25 @@ impl ResourceFilter {
             .collect()
     }
 
+    /// Filter configmaps based on criteria
+    pub fn filter_configmaps(
+        configmaps: Vec<ConfigMapInfo>,
+        criteria: &FilterCriteria,
+    ) -> Vec<ConfigMapInfo> {
+        configmaps
+            .into_iter()
+            .filter(|configmap| Self::matches_configmap_criteria(configmap, criteria))
+            .collect()
+    }
+
+    /// Filter secrets based on criteria
+    pub fn filter_secrets(secrets: Vec<SecretInfo>, criteria: &FilterCriteria) -> Vec<SecretInfo> {
+        secrets
+            .into_iter()
+            .filter(|secret| Self::matches_secret_criteria(secret, criteria))
+            .collect()
+    }
+
     fn matches_criteria(service: &ServiceInfo, criteria: &FilterCriteria) -> bool {
         // Label selector check
         if let Some(selector_str) = &criteria.label_selector {
@@ -347,6 +372,36 @@ impl ResourceFilter {
 
         true
     }
+
+    fn matches_configmap_criteria(configmap: &ConfigMapInfo, criteria: &FilterCriteria) -> bool {
+        // Label selector check
+        if let Some(selector_str) = &criteria.label_selector {
+            if let Ok(selector) = LabelSelector::parse(selector_str) {
+                if !selector.matches(&configmap.labels) {
+                    return false;
+                }
+            }
+        }
+
+        // TODO: Add age filtering when we implement proper timestamp parsing
+
+        true
+    }
+
+    fn matches_secret_criteria(secret: &SecretInfo, criteria: &FilterCriteria) -> bool {
+        // Label selector check
+        if let Some(selector_str) = &criteria.label_selector {
+            if let Ok(selector) = LabelSelector::parse(selector_str) {
+                if !selector.matches(&secret.labels) {
+                    return false;
+                }
+            }
+        }
+
+        // TODO: Add age filtering when we implement proper timestamp parsing
+
+        true
+    }
 }
 
 /// Resource grouping utilities
@@ -387,6 +442,66 @@ impl ResourceGrouper {
                 group.deployments = deployments;
                 group.statefulsets = statefulsets;
                 group.daemonsets = daemonsets;
+                groups.insert("all".to_string(), group);
+            }
+        }
+
+        GroupedResources { groups }
+    }
+
+    /// Group configmaps by the specified criteria
+    pub fn group_configmaps(configmaps: Vec<ConfigMapInfo>, group_by: &GroupBy) -> GroupedResources {
+        let mut groups = BTreeMap::new();
+
+        match group_by {
+            GroupBy::App => {
+                Self::group_configmaps_by_label(&mut groups, configmaps, "app");
+            }
+            GroupBy::Tier => {
+                Self::group_configmaps_by_label(&mut groups, configmaps, "tier");
+            }
+            GroupBy::HelmRelease => {
+                Self::group_configmaps_by_label(&mut groups, configmaps, "app.kubernetes.io/instance");
+            }
+            GroupBy::Namespace => {
+                Self::group_configmaps_by_namespace(&mut groups, configmaps);
+            }
+            GroupBy::CustomLabel(label_key) => {
+                Self::group_configmaps_by_label(&mut groups, configmaps, label_key);
+            }
+            GroupBy::None => {
+                let mut group = ResourceGroup::new("All ConfigMaps".to_string(), "none".to_string());
+                // Note: We'd need to extend ResourceGroup to include configmaps field
+                groups.insert("all".to_string(), group);
+            }
+        }
+
+        GroupedResources { groups }
+    }
+
+    /// Group secrets by the specified criteria
+    pub fn group_secrets(secrets: Vec<SecretInfo>, group_by: &GroupBy) -> GroupedResources {
+        let mut groups = BTreeMap::new();
+
+        match group_by {
+            GroupBy::App => {
+                Self::group_secrets_by_label(&mut groups, secrets, "app");
+            }
+            GroupBy::Tier => {
+                Self::group_secrets_by_label(&mut groups, secrets, "tier");
+            }
+            GroupBy::HelmRelease => {
+                Self::group_secrets_by_label(&mut groups, secrets, "app.kubernetes.io/instance");
+            }
+            GroupBy::Namespace => {
+                Self::group_secrets_by_namespace(&mut groups, secrets);
+            }
+            GroupBy::CustomLabel(label_key) => {
+                Self::group_secrets_by_label(&mut groups, secrets, label_key);
+            }
+            GroupBy::None => {
+                let mut group = ResourceGroup::new("All Secrets".to_string(), "none".to_string());
+                // Note: We'd need to extend ResourceGroup to include secrets field
                 groups.insert("all".to_string(), group);
             }
         }
@@ -535,6 +650,68 @@ impl ResourceGrouper {
                 .entry(daemonset.namespace.clone())
                 .or_insert_with(|| ResourceGroup::new(daemonset.namespace.clone(), "namespace".to_string()));
             group.daemonsets.push(daemonset);
+        }
+    }
+
+    fn group_configmaps_by_label(
+        groups: &mut BTreeMap<String, ResourceGroup>,
+        configmaps: Vec<ConfigMapInfo>,
+        label_key: &str,
+    ) {
+        for configmap in configmaps {
+            let group_name = configmap
+                .labels
+                .get(label_key)
+                .unwrap_or(&"unknown".to_string())
+                .clone();
+
+            let group = groups
+                .entry(group_name.clone())
+                .or_insert_with(|| ResourceGroup::new(group_name, label_key.to_string()));
+            group.configmaps.push(configmap);
+        }
+    }
+
+    fn group_configmaps_by_namespace(
+        groups: &mut BTreeMap<String, ResourceGroup>,
+        configmaps: Vec<ConfigMapInfo>,
+    ) {
+        for configmap in configmaps {
+            let group = groups
+                .entry(configmap.namespace.clone())
+                .or_insert_with(|| ResourceGroup::new(configmap.namespace.clone(), "namespace".to_string()));
+            group.configmaps.push(configmap);
+        }
+    }
+
+    fn group_secrets_by_label(
+        groups: &mut BTreeMap<String, ResourceGroup>,
+        secrets: Vec<SecretInfo>,
+        label_key: &str,
+    ) {
+        for secret in secrets {
+            let group_name = secret
+                .labels
+                .get(label_key)
+                .unwrap_or(&"unknown".to_string())
+                .clone();
+
+            let group = groups
+                .entry(group_name.clone())
+                .or_insert_with(|| ResourceGroup::new(group_name, label_key.to_string()));
+            group.secrets.push(secret);
+        }
+    }
+
+    fn group_secrets_by_namespace(
+        groups: &mut BTreeMap<String, ResourceGroup>,
+        secrets: Vec<SecretInfo>,
+    ) {
+        for secret in secrets {
+            let group = groups
+                .entry(secret.namespace.clone())
+                .or_insert_with(|| ResourceGroup::new(secret.namespace.clone(), "namespace".to_string()));
+            group.secrets.push(secret);
         }
     }
 }
@@ -698,5 +875,190 @@ mod tests {
         // Test deserialization
         let deserialized: GroupedResources = serde_json::from_str(&json).expect("Failed to deserialize from JSON");
         assert!(deserialized.groups.contains_key("web"));
+    }
+
+    #[test]
+    fn test_filter_configmaps() {
+        use crate::discovery::{ConfigMapInfo, ResourceReference, ReferenceType};
+
+        let mut labels = BTreeMap::new();
+        labels.insert("app".to_string(), "web".to_string());
+        labels.insert("tier".to_string(), "frontend".to_string());
+
+        let configmap = ConfigMapInfo {
+            name: "web-config".to_string(),
+            namespace: "default".to_string(),
+            data_keys: vec!["config.yaml".to_string()],
+            age: "5d".to_string(),
+            labels,
+            used_by: vec![ResourceReference {
+                kind: "Pod".to_string(),
+                name: "web-pod".to_string(),
+                namespace: "default".to_string(),
+                reference_type: ReferenceType::VolumeMount,
+            }],
+            mount_paths: vec!["/etc/config".to_string()],
+        };
+
+        let configmaps = vec![configmap];
+
+        // Test label selector filtering
+        let criteria = FilterCriteria {
+            label_selector: Some("app=web".to_string()),
+            ..Default::default()
+        };
+        let filtered = ResourceFilter::filter_configmaps(configmaps.clone(), &criteria);
+        assert_eq!(filtered.len(), 1);
+
+        // Test label selector that doesn't match
+        let criteria = FilterCriteria {
+            label_selector: Some("app=api".to_string()),
+            ..Default::default()
+        };
+        let filtered = ResourceFilter::filter_configmaps(configmaps, &criteria);
+        assert_eq!(filtered.len(), 0);
+    }
+
+    #[test]
+    fn test_filter_secrets() {
+        use crate::discovery::{SecretInfo, ResourceReference, ReferenceType};
+
+        let mut labels = BTreeMap::new();
+        labels.insert("app".to_string(), "database".to_string());
+
+        let secret = SecretInfo {
+            name: "db-secret".to_string(),
+            namespace: "default".to_string(),
+            secret_type: "Opaque".to_string(),
+            data_keys: vec!["password".to_string(), "username".to_string()],
+            age: "10d".to_string(),
+            labels,
+            used_by: vec![ResourceReference {
+                kind: "Pod".to_string(),
+                name: "db-pod".to_string(),
+                namespace: "default".to_string(),
+                reference_type: ReferenceType::Environment,
+            }],
+            mount_paths: vec![],
+        };
+
+        let secrets = vec![secret];
+
+        // Test label selector filtering
+        let criteria = FilterCriteria {
+            label_selector: Some("app=database".to_string()),
+            ..Default::default()
+        };
+        let filtered = ResourceFilter::filter_secrets(secrets.clone(), &criteria);
+        assert_eq!(filtered.len(), 1);
+
+        // Test label selector that doesn't match
+        let criteria = FilterCriteria {
+            label_selector: Some("app=web".to_string()),
+            ..Default::default()
+        };
+        let filtered = ResourceFilter::filter_secrets(secrets, &criteria);
+        assert_eq!(filtered.len(), 0);
+    }
+
+    #[test]
+    fn test_group_configmaps_by_app() {
+        use crate::discovery::ConfigMapInfo;
+
+        let mut web_labels = BTreeMap::new();
+        web_labels.insert("app".to_string(), "web".to_string());
+
+        let mut api_labels = BTreeMap::new();
+        api_labels.insert("app".to_string(), "api".to_string());
+
+        let configmaps = vec![
+            ConfigMapInfo {
+                name: "web-config".to_string(),
+                namespace: "default".to_string(),
+                data_keys: vec!["config.yaml".to_string()],
+                age: "5d".to_string(),
+                labels: web_labels,
+                used_by: vec![],
+                mount_paths: vec![],
+            },
+            ConfigMapInfo {
+                name: "api-config".to_string(),
+                namespace: "default".to_string(),
+                data_keys: vec!["api.conf".to_string()],
+                age: "3d".to_string(),
+                labels: api_labels,
+                used_by: vec![],
+                mount_paths: vec![],
+            },
+        ];
+
+        let grouped = ResourceGrouper::group_configmaps(configmaps, &GroupBy::App);
+
+        assert_eq!(grouped.groups.len(), 2);
+        assert!(grouped.groups.contains_key("web"));
+        assert!(grouped.groups.contains_key("api"));
+
+        let web_group = &grouped.groups["web"];
+        assert_eq!(web_group.configmaps.len(), 1);
+        assert_eq!(web_group.configmaps[0].name, "web-config");
+    }
+
+    #[test]
+    fn test_group_secrets_by_namespace() {
+        use crate::discovery::SecretInfo;
+
+        let secrets = vec![
+            SecretInfo {
+                name: "secret1".to_string(),
+                namespace: "default".to_string(),
+                secret_type: "Opaque".to_string(),
+                data_keys: vec!["key1".to_string()],
+                age: "5d".to_string(),
+                labels: BTreeMap::new(),
+                used_by: vec![],
+                mount_paths: vec![],
+            },
+            SecretInfo {
+                name: "secret2".to_string(),
+                namespace: "production".to_string(),
+                secret_type: "kubernetes.io/tls".to_string(),
+                data_keys: vec!["tls.crt".to_string(), "tls.key".to_string()],
+                age: "30d".to_string(),
+                labels: BTreeMap::new(),
+                used_by: vec![],
+                mount_paths: vec![],
+            },
+        ];
+
+        let grouped = ResourceGrouper::group_secrets(secrets, &GroupBy::Namespace);
+
+        assert_eq!(grouped.groups.len(), 2);
+        assert!(grouped.groups.contains_key("default"));
+        assert!(grouped.groups.contains_key("production"));
+
+        let prod_group = &grouped.groups["production"];
+        assert_eq!(prod_group.secrets.len(), 1);
+        assert_eq!(prod_group.secrets[0].secret_type, "kubernetes.io/tls");
+    }
+
+    #[test]
+    fn test_resource_reference_types() {
+        use crate::discovery::ReferenceType;
+
+        // Test serialization of reference types
+        let volume_mount = ReferenceType::VolumeMount;
+        let environment = ReferenceType::Environment;
+        let env_from = ReferenceType::EnvironmentFrom;
+        let image_pull = ReferenceType::ImagePullSecret;
+
+        let json_vm = serde_json::to_string(&volume_mount).expect("Failed to serialize VolumeMount");
+        let json_env = serde_json::to_string(&environment).expect("Failed to serialize Environment");
+        let json_envfrom = serde_json::to_string(&env_from).expect("Failed to serialize EnvironmentFrom");
+        let json_imgpull = serde_json::to_string(&image_pull).expect("Failed to serialize ImagePullSecret");
+
+        assert!(json_vm.contains("VolumeMount"));
+        assert!(json_env.contains("Environment"));
+        assert!(json_envfrom.contains("EnvironmentFrom"));
+        assert!(json_imgpull.contains("ImagePullSecret"));
     }
 }

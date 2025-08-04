@@ -90,6 +90,50 @@ pub fn print_daemonsets(daemonsets: &[DaemonSetInfo], format: &OutputFormat) -> 
     Ok(())
 }
 
+/// Print configmaps in the specified format
+pub fn print_configmaps(configmaps: &[ConfigMapInfo], format: &OutputFormat) -> Result<()> {
+    match format {
+        OutputFormat::Table => print_configmaps_table(configmaps),
+        OutputFormat::Json => print_json(&configmaps)?,
+        OutputFormat::Yaml => print_yaml(&configmaps)?,
+    }
+
+    Ok(())
+}
+
+/// Print secrets in the specified format
+pub fn print_secrets(secrets: &[SecretInfo], format: &OutputFormat) -> Result<()> {
+    match format {
+        OutputFormat::Table => print_secrets_table(secrets),
+        OutputFormat::Json => print_json(&secrets)?,
+        OutputFormat::Yaml => print_yaml(&secrets)?,
+    }
+
+    Ok(())
+}
+
+/// Print grouped configmaps in the specified format
+pub fn print_grouped_configmaps(grouped: &GroupedResources, format: &OutputFormat) -> Result<()> {
+    match format {
+        OutputFormat::Table => print_grouped_configmaps_table(grouped),
+        OutputFormat::Json => print_json(&grouped)?,
+        OutputFormat::Yaml => print_yaml(&grouped)?,
+    }
+
+    Ok(())
+}
+
+/// Print grouped secrets in the specified format
+pub fn print_grouped_secrets(grouped: &GroupedResources, format: &OutputFormat) -> Result<()> {
+    match format {
+        OutputFormat::Table => print_grouped_secrets_table(grouped),
+        OutputFormat::Json => print_json(&grouped)?,
+        OutputFormat::Yaml => print_yaml(&grouped)?,
+    }
+
+    Ok(())
+}
+
 /// Print grouped resources in the specified format
 pub fn print_grouped_resources(grouped: &GroupedResources, format: &OutputFormat) -> Result<()> {
     match format {
@@ -513,11 +557,11 @@ fn print_configuration_table(configmaps: &[ConfigMapInfo], secrets: &[SecretInfo
     if !configmaps.is_empty() {
         println!("  ConfigMaps:");
         for cm in configmaps {
-            let mount_info = cm
-                .mount_path
-                .as_ref()
-                .map(|path| format!(" (mounted at {})", path))
-                .unwrap_or_else(|| " (environment variable)".to_string());
+            let mount_info = if cm.mount_paths.is_empty() {
+                " (environment variable)".to_string()
+            } else {
+                format!(" (mounted at {})", cm.mount_paths.join(", "))
+            };
             println!(
                 "    {} (namespace: {}){}",
                 cm.name.cyan(),
@@ -530,11 +574,11 @@ fn print_configuration_table(configmaps: &[ConfigMapInfo], secrets: &[SecretInfo
     if !secrets.is_empty() {
         println!("  Secrets:");
         for secret in secrets {
-            let mount_info = secret
-                .mount_path
-                .as_ref()
-                .map(|path| format!(" (mounted at {})", path))
-                .unwrap_or_else(|| " (environment variable)".to_string());
+            let mount_info = if secret.mount_paths.is_empty() {
+                " (environment variable)".to_string()
+            } else {
+                format!(" (mounted at {})", secret.mount_paths.join(", "))
+            };
             println!(
                 "    {} (namespace: {}, type: {}){}",
                 secret.name.yellow(),
@@ -571,6 +615,115 @@ fn print_health_table(health: &ServiceHealth) {
 
     if !health.overall_healthy {
         println!("  Note: Service may not be accessible or may not have a valid cluster IP");
+    }
+}
+
+fn print_configmaps_table(configmaps: &[ConfigMapInfo]) {
+    if configmaps.is_empty() {
+        println!("No configmaps found");
+        return;
+    }
+
+    #[derive(Tabled)]
+    struct ConfigMapRow {
+        #[tabled(rename = "NAME")]
+        name: String,
+        #[tabled(rename = "NAMESPACE")]
+        namespace: String,
+        #[tabled(rename = "DATA")]
+        data_count: String,
+        #[tabled(rename = "AGE")]
+        age: String,
+        #[tabled(rename = "USED BY")]
+        used_by: String,
+    }
+
+    let rows: Vec<ConfigMapRow> = configmaps
+        .iter()
+        .map(|cm| ConfigMapRow {
+            name: cm.name.clone(),
+            namespace: cm.namespace.clone(),
+            data_count: cm.data_keys.len().to_string(),
+            age: cm.age.clone(),
+            used_by: if cm.used_by.is_empty() {
+                "None".to_string()
+            } else {
+                format!("{} resources", cm.used_by.len())
+            },
+        })
+        .collect();
+
+    let table = Table::new(rows);
+    println!("{}", table);
+}
+
+fn print_secrets_table(secrets: &[SecretInfo]) {
+    if secrets.is_empty() {
+        println!("No secrets found");
+        return;
+    }
+
+    #[derive(Tabled)]
+    struct SecretRow {
+        #[tabled(rename = "NAME")]
+        name: String,
+        #[tabled(rename = "NAMESPACE")]
+        namespace: String,
+        #[tabled(rename = "TYPE")]
+        secret_type: String,
+        #[tabled(rename = "DATA")]
+        data_count: String,
+        #[tabled(rename = "AGE")]
+        age: String,
+        #[tabled(rename = "USED BY")]
+        used_by: String,
+    }
+
+    let rows: Vec<SecretRow> = secrets
+        .iter()
+        .map(|s| SecretRow {
+            name: s.name.clone(),
+            namespace: s.namespace.clone(),
+            secret_type: s.secret_type.clone(),
+            data_count: s.data_keys.len().to_string(),
+            age: s.age.clone(),
+            used_by: if s.used_by.is_empty() {
+                "None".to_string()
+            } else {
+                format!("{} resources", s.used_by.len())
+            },
+        })
+        .collect();
+
+    let table = Table::new(rows);
+    println!("{}", table);
+}
+
+fn print_grouped_configmaps_table(grouped: &GroupedResources) {
+    for (group_name, group) in &grouped.groups {
+        println!("\n=== ConfigMap Group: {} ({}) ===", group_name, group.group_type);
+
+        if !group.configmaps.is_empty() {
+            print_configmaps_table(&group.configmaps);
+        } else {
+            println!("No configmaps in this group");
+        }
+
+        println!("Total configmaps in group: {}", group.configmaps.len());
+    }
+}
+
+fn print_grouped_secrets_table(grouped: &GroupedResources) {
+    for (group_name, group) in &grouped.groups {
+        println!("\n=== Secret Group: {} ({}) ===", group_name, group.group_type);
+
+        if !group.secrets.is_empty() {
+            print_secrets_table(&group.secrets);
+        } else {
+            println!("No secrets in this group");
+        }
+
+        println!("Total secrets in group: {}", group.secrets.len());
     }
 }
 

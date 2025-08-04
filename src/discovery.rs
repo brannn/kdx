@@ -196,22 +196,17 @@ impl DiscoveryEngine {
 
         for config_name in common_config_names {
             // Check for ConfigMap
-            if configmaps.get(&config_name).await.is_ok() {
-                found_configmaps.push(ConfigMapInfo {
-                    name: config_name.clone(),
-                    namespace: namespace.to_string(),
-                    mount_path: None, // Would need pod analysis to determine
-                });
+            if let Ok(configmap) = configmaps.get(&config_name).await {
+                if let Some(configmap_info) = self.convert_configmap_to_info(configmap).await {
+                    found_configmaps.push(configmap_info);
+                }
             }
 
             // Check for Secret
-            if secrets.get(&config_name).await.is_ok() {
-                found_secrets.push(SecretInfo {
-                    name: config_name,
-                    namespace: namespace.to_string(),
-                    mount_path: None, // Would need pod analysis to determine
-                    secret_type: "Opaque".to_string(),
-                });
+            if let Ok(secret) = secrets.get(&config_name).await {
+                if let Some(secret_info) = self.convert_secret_to_info(secret).await {
+                    found_secrets.push(secret_info);
+                }
             }
         }
 
@@ -273,6 +268,50 @@ impl DiscoveryEngine {
         }
 
         Ok(daemonset_infos)
+    }
+
+    /// List configmaps in the specified namespace (or all namespaces if None)
+    pub async fn list_configmaps(&self, namespace: Option<&str>) -> Result<Vec<ConfigMapInfo>> {
+        let configmaps: Api<ConfigMap> = match namespace {
+            Some(ns) => Api::namespaced(self.client.clone(), ns),
+            None => Api::all(self.client.clone()),
+        };
+
+        let configmap_list = configmaps.list(&Default::default()).await?;
+
+        let mut configmap_infos = Vec::new();
+        for configmap in configmap_list.items {
+            if let Some(configmap_info) = self.convert_configmap_to_info(configmap).await {
+                configmap_infos.push(configmap_info);
+            }
+        }
+
+        // Find associations with other resources
+        self.find_configmap_associations(&mut configmap_infos).await?;
+
+        Ok(configmap_infos)
+    }
+
+    /// List secrets in the specified namespace (or all namespaces if None)
+    pub async fn list_secrets(&self, namespace: Option<&str>) -> Result<Vec<SecretInfo>> {
+        let secrets: Api<Secret> = match namespace {
+            Some(ns) => Api::namespaced(self.client.clone(), ns),
+            None => Api::all(self.client.clone()),
+        };
+
+        let secret_list = secrets.list(&Default::default()).await?;
+
+        let mut secret_infos = Vec::new();
+        for secret in secret_list.items {
+            if let Some(secret_info) = self.convert_secret_to_info(secret).await {
+                secret_infos.push(secret_info);
+            }
+        }
+
+        // Find associations with other resources
+        self.find_secret_associations(&mut secret_infos).await?;
+
+        Ok(secret_infos)
     }
 
     /// Check the health of a service by testing its cluster IP endpoints
@@ -527,6 +566,118 @@ impl DiscoveryEngine {
             selector,
         })
     }
+
+    async fn convert_configmap_to_info(&self, configmap: ConfigMap) -> Option<ConfigMapInfo> {
+        let metadata = configmap.metadata;
+        let data = configmap.data.unwrap_or_default();
+
+        let name = metadata.name?;
+        let namespace = metadata.namespace.unwrap_or_else(|| "default".to_string());
+        let labels = metadata.labels.unwrap_or_default();
+
+        let data_keys: Vec<String> = data.keys().cloned().collect();
+
+        Some(ConfigMapInfo {
+            name,
+            namespace,
+            data_keys,
+            age: "Unknown".to_string(), // TODO: Calculate from creation timestamp
+            labels,
+            used_by: Vec::new(), // Will be populated by association finding
+            mount_paths: Vec::new(), // Will be populated by association finding
+        })
+    }
+
+    async fn convert_secret_to_info(&self, secret: Secret) -> Option<SecretInfo> {
+        let metadata = secret.metadata;
+        let data = secret.data.unwrap_or_default();
+
+        let name = metadata.name?;
+        let namespace = metadata.namespace.unwrap_or_else(|| "default".to_string());
+        let labels = metadata.labels.unwrap_or_default();
+        let secret_type = secret.type_.unwrap_or_else(|| "Opaque".to_string());
+
+        let data_keys: Vec<String> = data.keys().cloned().collect();
+
+        Some(SecretInfo {
+            name,
+            namespace,
+            secret_type,
+            data_keys,
+            age: "Unknown".to_string(), // TODO: Calculate from creation timestamp
+            labels,
+            used_by: Vec::new(), // Will be populated by association finding
+            mount_paths: Vec::new(), // Will be populated by association finding
+        })
+    }
+
+    async fn find_configmap_associations(&self, configmaps: &mut [ConfigMapInfo]) -> Result<()> {
+        // Find all pods that reference these ConfigMaps
+        let pods = self.list_pods(None, None).await?;
+
+        for configmap in configmaps.iter_mut() {
+            for pod in &pods {
+                self.check_pod_configmap_references(pod, configmap);
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn find_secret_associations(&self, secrets: &mut [SecretInfo]) -> Result<()> {
+        // Find all pods that reference these Secrets
+        let pods = self.list_pods(None, None).await?;
+
+        for secret in secrets.iter_mut() {
+            for pod in &pods {
+                self.check_pod_secret_references(pod, secret);
+            }
+        }
+
+        Ok(())
+    }
+
+    fn check_pod_configmap_references(&self, pod: &PodInfo, configmap: &mut ConfigMapInfo) {
+        // This is a simplified implementation
+        // In a real implementation, we would need to access the Pod spec
+        // to check for volume mounts and environment variable references
+
+        // For now, we'll add a placeholder reference if the pod is in the same namespace
+        if pod.namespace == configmap.namespace {
+            let reference = ResourceReference {
+                kind: "Pod".to_string(),
+                name: pod.name.clone(),
+                namespace: pod.namespace.clone(),
+                reference_type: ReferenceType::VolumeMount, // Placeholder
+            };
+
+            // Only add if not already present
+            if !configmap.used_by.iter().any(|r| r.name == reference.name && r.kind == reference.kind) {
+                configmap.used_by.push(reference);
+            }
+        }
+    }
+
+    fn check_pod_secret_references(&self, pod: &PodInfo, secret: &mut SecretInfo) {
+        // This is a simplified implementation
+        // In a real implementation, we would need to access the Pod spec
+        // to check for volume mounts, environment variables, and imagePullSecrets
+
+        // For now, we'll add a placeholder reference if the pod is in the same namespace
+        if pod.namespace == secret.namespace {
+            let reference = ResourceReference {
+                kind: "Pod".to_string(),
+                name: pod.name.clone(),
+                namespace: pod.namespace.clone(),
+                reference_type: ReferenceType::VolumeMount, // Placeholder
+            };
+
+            // Only add if not already present
+            if !secret.used_by.iter().any(|r| r.name == reference.name && r.kind == reference.kind) {
+                secret.used_by.push(reference);
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -581,15 +732,39 @@ pub struct IngressPath {
 pub struct ConfigMapInfo {
     pub name: String,
     pub namespace: String,
-    pub mount_path: Option<String>,
+    pub data_keys: Vec<String>,
+    pub age: String,
+    pub labels: BTreeMap<String, String>,
+    pub used_by: Vec<ResourceReference>,
+    pub mount_paths: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SecretInfo {
     pub name: String,
     pub namespace: String,
-    pub mount_path: Option<String>,
     pub secret_type: String,
+    pub data_keys: Vec<String>,
+    pub age: String,
+    pub labels: BTreeMap<String, String>,
+    pub used_by: Vec<ResourceReference>,
+    pub mount_paths: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResourceReference {
+    pub kind: String,
+    pub name: String,
+    pub namespace: String,
+    pub reference_type: ReferenceType,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ReferenceType {
+    VolumeMount,
+    Environment,
+    EnvironmentFrom,
+    ImagePullSecret,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

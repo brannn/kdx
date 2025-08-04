@@ -177,6 +177,84 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
             let daemonsets = discovery.list_daemonsets(ns).await?;
             output::print_daemonsets(&daemonsets, &cli.output)?;
         }
+        Commands::ConfigMaps {
+            namespace,
+            all_namespaces,
+            selector,
+            group_by,
+            unused,
+        } => {
+            let ns = if all_namespaces {
+                None
+            } else {
+                namespace.as_deref().or(cli.namespace.as_deref())
+            };
+
+            let mut configmaps = discovery.list_configmaps(ns).await?;
+
+            // Apply filtering
+            let criteria = FilterCriteria {
+                label_selector: selector,
+                ..Default::default()
+            };
+            configmaps = ResourceFilter::filter_configmaps(configmaps, &criteria);
+
+            // Filter for unused if requested
+            if unused {
+                configmaps = configmaps.into_iter().filter(|cm| cm.used_by.is_empty()).collect();
+            }
+
+            // Apply grouping if specified
+            if let Some(group_by_str) = group_by {
+                let group_by = parse_group_by(&group_by_str);
+                let grouped = ResourceGrouper::group_configmaps(configmaps, &group_by);
+                output::print_grouped_configmaps(&grouped, &cli.output)?;
+            } else {
+                output::print_configmaps(&configmaps, &cli.output)?;
+            }
+        }
+        Commands::Secrets {
+            namespace,
+            all_namespaces,
+            selector,
+            group_by,
+            unused,
+            secret_type,
+        } => {
+            let ns = if all_namespaces {
+                None
+            } else {
+                namespace.as_deref().or(cli.namespace.as_deref())
+            };
+
+            let mut secrets = discovery.list_secrets(ns).await?;
+
+            // Apply filtering
+            let criteria = FilterCriteria {
+                label_selector: selector,
+                ..Default::default()
+            };
+            secrets = ResourceFilter::filter_secrets(secrets, &criteria);
+
+            // Filter by secret type if specified
+            if let Some(stype) = secret_type {
+                secrets = secrets.into_iter().filter(|s| s.secret_type == stype).collect();
+            }
+
+            // Filter for unused if requested
+            if unused {
+                secrets = secrets.into_iter().filter(|s| s.used_by.is_empty()).collect();
+            }
+
+            // Apply grouping if specified
+            if let Some(group_by_str) = group_by {
+                let group_by = parse_group_by(&group_by_str);
+                let grouped = ResourceGrouper::group_secrets(secrets, &group_by);
+                output::print_grouped_secrets(&grouped, &cli.output)?;
+            } else {
+                output::print_secrets(&secrets, &cli.output)?;
+            }
+        }
         Commands::Describe { service, namespace } => {
             let ns = namespace
                 .as_deref()

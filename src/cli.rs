@@ -118,6 +118,56 @@ pub enum Commands {
         all_namespaces: bool,
     },
 
+    /// List configmaps in the cluster
+    ConfigMaps {
+        /// Show configmaps from a specific namespace
+        #[clap(long, short = 'n')]
+        namespace: Option<String>,
+
+        /// Show all namespaces
+        #[clap(long, short = 'A')]
+        all_namespaces: bool,
+
+        /// Filter by label selector (e.g., app=web,tier!=cache)
+        #[clap(long, short = 's')]
+        selector: Option<String>,
+
+        /// Group resources by criteria (app, tier, helm-release, namespace)
+        #[clap(long, short = 'g')]
+        group_by: Option<String>,
+
+        /// Show unused configmaps (not referenced by any resource)
+        #[clap(long)]
+        unused: bool,
+    },
+
+    /// List secrets in the cluster
+    Secrets {
+        /// Show secrets from a specific namespace
+        #[clap(long, short = 'n')]
+        namespace: Option<String>,
+
+        /// Show all namespaces
+        #[clap(long, short = 'A')]
+        all_namespaces: bool,
+
+        /// Filter by label selector (e.g., app=web,tier!=cache)
+        #[clap(long, short = 's')]
+        selector: Option<String>,
+
+        /// Group resources by criteria (app, tier, helm-release, namespace)
+        #[clap(long, short = 'g')]
+        group_by: Option<String>,
+
+        /// Show unused secrets (not referenced by any resource)
+        #[clap(long)]
+        unused: bool,
+
+        /// Filter by secret type (Opaque, kubernetes.io/tls, etc.)
+        #[clap(long)]
+        secret_type: Option<String>,
+    },
+
     /// Describe a service and its relationships
     Describe {
         /// Service name to describe
