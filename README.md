@@ -112,16 +112,34 @@ $ kdx services --namespace production --format yaml
 
 ## Features
 
-- Service Discovery: List and explore services across namespaces
-- Pod Exploration: Find pods with flexible filtering options
-- Service Descriptions: Get detailed information about services and their relationships
-- Topology Analysis: Understand service topology and backend connections
-- Graph Visualization: Generate service dependency graphs in DOT and SVG formats
-- Multiple Output Formats: Table, JSON, and YAML output support
-- Namespace Filtering: Work with specific namespaces or across all namespaces
-- Ingress Discovery: Show which services are exposed via ingress
-- Configuration Analysis: Discover ConfigMaps and Secrets used by services
-- Health Checking: Test service accessibility
+### Resource Discovery
+- **Workload Resources**: Deployments, StatefulSets, DaemonSets with replica status and metadata
+- **Core Resources**: Services, Pods with comprehensive filtering and status information
+- **Configuration Resources**: ConfigMaps and Secrets with usage tracking and association mapping
+- **Custom Resources**: CRD discovery with version analysis and instance counting
+- **Cross-namespace Discovery**: Query resources across all namespaces or specific namespaces
+
+### Advanced Filtering
+- **Label Selectors**: Complex expressions with equals, not-equals, in, not-in, exists, not-exists operators
+- **Status Filtering**: Filter by resource status (Running, Pending, Failed, Ready, NotReady)
+- **Usage Filtering**: Find unused ConfigMaps and Secrets for cleanup identification
+- **Type Filtering**: Filter secrets by type (Opaque, TLS, Docker registry)
+- **Instance Filtering**: Show only CRDs that have active instances
+
+### Resource Grouping
+- **Application Grouping**: Group by app label for application-centric views
+- **Helm Release Grouping**: Group by Helm release for deployment management
+- **Namespace Grouping**: Organize resources by namespace boundaries
+- **Tier Grouping**: Group by tier labels (frontend, backend, database)
+- **Custom Label Grouping**: Group by any custom label key
+
+### Analysis and Visualization
+- **Topology Analysis**: Service dependency mapping and relationship discovery
+- **Graph Visualization**: Generate service dependency graphs in DOT and SVG formats
+- **Configuration Analysis**: Map ConfigMaps and Secrets to consuming resources
+- **Version Analysis**: CRD version tracking with served/storage status
+- **Security Analysis**: Secret usage patterns without exposing sensitive data
+- **Multiple Output Formats**: Table, JSON, and YAML output for all resource types
 
 ## Installation
 
@@ -162,31 +180,67 @@ kdx graph
 # Get help
 kdx --help
 ```
-### Basic Commands
+### Core Resource Commands
 
-List all services in the default namespace:
 ```bash
-kdx services
+# Services
+kdx services                                    # List services in current namespace
+kdx services --all-namespaces                  # List services across all namespaces
+kdx services --selector app=web                # Filter services by labels
+
+# Pods
+kdx pods                                        # List pods in current namespace
+kdx pods --selector app=web,tier!=cache        # Complex label filtering
+kdx pods --status Running                      # Filter by pod status
+kdx pods --group-by app                        # Group pods by application
+
+# Workload Resources
+kdx deployments                                 # List deployments
+kdx deployments --status Ready                 # Filter by deployment status
+kdx statefulsets --group-by helm-release       # Group StatefulSets by Helm release
+kdx daemonsets --all-namespaces                # List DaemonSets across all namespaces
 ```
 
-List all pods in a specific namespace:
+### Configuration and Security
+
 ```bash
-kdx pods -n monitoring
+# ConfigMaps
+kdx configmaps                                  # List ConfigMaps with usage info
+kdx configmaps --unused                        # Find unused ConfigMaps
+kdx configmaps --selector app=web              # Filter by labels
+kdx configmaps --group-by namespace            # Group by namespace
+
+# Secrets
+kdx secrets                                     # List secrets (data keys only, no values)
+kdx secrets --secret-type kubernetes.io/tls    # Filter by secret type
+kdx secrets --unused --all-namespaces          # Find unused secrets cluster-wide
 ```
 
-Get detailed information about a service:
+### Custom Resources
+
 ```bash
-kdx describe grafana -n monitoring
+# Custom Resource Definitions
+kdx crds                                        # List all CRDs
+kdx crds --with-instances                       # Show only CRDs with active instances
+kdx crds --show-versions                        # Display version information
+kdx crds --group-by scope                       # Group by Cluster vs Namespaced
+
+# Custom Resource Instances
+kdx custom-resources prometheuses.monitoring.coreos.com    # List instances of specific CRD
+kdx custom-resources certificates.cert-manager.io -n prod  # List in specific namespace
 ```
 
-Show service topology:
-```bash
-kdx topology grafana -n monitoring
+### Topology and Analysis
 
-Generate a service dependency graph:
 ```bash
-kdx graph -n monitoring
-``````
+# Service Topology
+kdx describe grafana -n monitoring             # Get detailed service information
+kdx topology grafana -n monitoring             # Show service topology and relationships
+
+# Graph Visualization
+kdx graph -n monitoring                         # Generate service dependency graph
+kdx graph --format svg                          # Generate SVG format graph
+```
 
 ### Output Formats
 
@@ -218,32 +272,65 @@ kdx services
 
 ## Examples
 
-### Service Discovery
+### Application Analysis
+
+```bash
+# Analyze a complete application stack
+kdx deployments --selector app=ecommerce --group-by tier
+kdx services --selector app=ecommerce --group-by tier
+kdx configmaps --selector app=ecommerce
+
+# Check application health across environments
+kdx pods --selector 'app=api,env in (prod,staging)' --status Running
+kdx deployments --selector 'app=api,env in (prod,staging)' --status Ready
+```
+
+### Security and Configuration Audit
+
+```bash
+# Find unused configurations for cleanup
+kdx configmaps --unused --all-namespaces
+kdx secrets --unused --all-namespaces
+
+# Audit TLS certificates
+kdx secrets --secret-type kubernetes.io/tls --all-namespaces
+
+# Review configuration usage patterns
+kdx configmaps --group-by app --output yaml
+```
+
+### Helm Release Management
+
+```bash
+# Analyze Helm releases
+kdx deployments --group-by helm-release
+kdx services --group-by helm-release
+kdx configmaps --group-by helm-release
+
+# Check specific Helm release
+kdx pods --selector 'app.kubernetes.io/instance=prometheus' --group-by app
+```
+
+### Custom Resource Analysis
+
+```bash
+# Survey custom resources in cluster
+kdx crds --with-instances --show-versions
+
+# Analyze monitoring stack
+kdx custom-resources prometheuses.monitoring.coreos.com
+kdx custom-resources servicemonitors.monitoring.coreos.com
+
+# Check cert-manager certificates
+kdx custom-resources certificates.cert-manager.io --all-namespaces
+```
+
+### Service Discovery and Analysis
 
 ```bash
 # List services with selector filtering
 kdx services --selector app=nginx
 
-# List services in JSON format
-kdx services --output json -n production
-```
-
-### Pod Exploration
-
-```bash
-# List all pods
-kdx pods
-
-# Filter pods by selector
-kdx pods --selector app=web
-
-# Show pods across all namespaces
-kdx pods --all-namespaces
-```
-
-### Service Analysis
-
-```bash
 # Get comprehensive service information
 kdx describe api-service -n production
 
@@ -271,6 +358,66 @@ kdx graph --format=svg
 
 # Save graph to file
 kdx graph -n monitoring > services.dot
+```
+
+## Advanced Filtering and Grouping
+
+### Label Selector Syntax
+
+```bash
+# Basic equality
+kdx pods --selector app=web
+
+# Inequality
+kdx pods --selector tier!=database
+
+# Set-based selection
+kdx pods --selector 'env in (prod,staging)'
+kdx pods --selector 'tier notin (cache,temp)'
+
+# Existence checks
+kdx pods --selector app                    # Has 'app' label
+kdx pods --selector '!temp'                # Does not have 'temp' label
+
+# Complex combinations
+kdx deployments --selector 'app=web,tier=frontend,env in (prod,staging)'
+```
+
+### Grouping Options
+
+```bash
+# Group by application
+kdx services --group-by app
+
+# Group by tier (frontend, backend, database)
+kdx deployments --group-by tier
+
+# Group by Helm release
+kdx pods --group-by helm-release
+
+# Group by namespace
+kdx configmaps --group-by namespace
+
+# Group by custom label
+kdx secrets --group-by environment
+```
+
+### Status and Type Filtering
+
+```bash
+# Pod status filtering
+kdx pods --status Running
+kdx pods --status Pending
+kdx pods --status Failed
+
+# Deployment status filtering
+kdx deployments --status Ready
+kdx deployments --status NotReady
+
+# Secret type filtering
+kdx secrets --secret-type Opaque
+kdx secrets --secret-type kubernetes.io/tls
+kdx secrets --secret-type kubernetes.io/dockerconfigjson
 
 # Convert to PNG (requires Graphviz)
 kdx graph -n monitoring | dot -Tpng -o services.png
