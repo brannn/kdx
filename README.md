@@ -13,6 +13,54 @@ A command-line tool for exploring and discovering resources in Kubernetes cluste
 
 ## Quick Demo
 
+### Comprehensive Resource Discovery with Advanced Filtering
+
+```console
+$ kdx deployments --selector 'app=web,tier!=cache' --group-by helm-release
+
+=== Deployment Group: web-frontend (helm-release) ===
+NAME           NAMESPACE    READY   UP-TO-DATE   AVAILABLE   AGE
+web-frontend   production   3/3     3            3           5d
+web-api        production   2/2     2            2           5d
+
+Total deployments in group: 2
+```
+
+### Configuration Management and Security Analysis
+
+```console
+$ kdx configmaps --unused --all-namespaces
+
+NAME                NAMESPACE     DATA   AGE    USED BY
+old-config          staging       3      30d    None
+deprecated-settings production    1      45d    None
+
+$ kdx secrets --secret-type kubernetes.io/tls --group-by namespace
+
+=== Secret Group: production (namespace) ===
+NAME              TYPE                AGE    USED BY
+api-tls-cert      kubernetes.io/tls   90d    ingress-nginx
+auth-tls-cert     kubernetes.io/tls   45d    auth-service
+```
+
+### Custom Resource Discovery and Analysis
+
+```console
+$ kdx crds --with-instances --show-versions
+
+NAME                              GROUP                 VERSION   INSTANCES   AGE
+prometheuses.monitoring.coreos.com monitoring.coreos.com v1        3          90d
+certificates.cert-manager.io      cert-manager.io       v1        12         120d
+
+$ kdx custom-resources prometheuses.monitoring.coreos.com
+
+NAME                 NAMESPACE    VERSION   REPLICAS   AGE
+prometheus-main      monitoring   v2.45.0   2          90d
+prometheus-federate  monitoring   v2.45.0   1          60d
+```
+
+### Service Topology and Dependency Analysis
+
 ```console
 $ kdx topology --namespace monitoring grafana
 
@@ -22,35 +70,12 @@ Service Topology: grafana
 ├── Cluster IP: 10.43.132.227
 └── Backend Pods:
     └── grafana-5df9c4787-fxl27 (Running)
-```
 
-```console
 $ kdx graph --namespace production --output dot > services.dot
-
-$ dot -Tpng services.dot -o services.png
-$ dot -Tsvg services.dot -o services.svg
-
-Generated visual dependency graph:
-- services.dot (DOT format)
-- services.png (PNG image)
-- services.svg (SVG vector graphic)
+# Generate visual dependency graphs for architecture documentation
 ```
 
-```console
-$ kdx describe api-gateway --namespace production
-
-Service Description: api-gateway
-├── Namespace: production
-├── Type: LoadBalancer
-├── Cluster IP: 10.43.132.227
-├── External IP: 203.0.113.10
-├── Ports:
-│   ├── http: 80 -> 8080 (TCP)
-│   └── https: 443 -> 8443 (TCP)
-└── Backend Pods:
-    ├── api-gateway-abc123 (Running)
-    └── api-gateway-def456 (Running)
-```
+**📖 For comprehensive documentation and examples of all commands, see the [User Guide](USER_GUIDE.md)**
 
 ```console
 $ kdx services --namespace production --selector 'service.kubernetes.io/load-balancer-cleanup'
