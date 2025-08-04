@@ -7,12 +7,14 @@
 mod cli;
 mod discovery;
 mod error;
+mod filtering;
 mod graph;
 mod output;
 
 use clap::Parser;
 use cli::{Cli, Commands};
 use discovery::ServiceHealth;
+use filtering::{FilterCriteria, GroupBy, ResourceFilter, ResourceGrouper};
 use std::process;
 
 #[tokio::main]
@@ -52,6 +54,8 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
         Commands::Services {
             namespace,
             all_namespaces,
+            selector,
+            group_by,
         } => {
             let ns = if all_namespaces {
                 None
@@ -59,13 +63,32 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
                 namespace.as_deref().or(cli.namespace.as_deref())
             };
 
-            let services = discovery.list_services(ns).await?;
-            output::print_services(&services, &cli.output)?;
+            let mut services = discovery.list_services(ns).await?;
+
+            // Apply filtering
+            let criteria = FilterCriteria {
+                label_selector: selector,
+                ..Default::default()
+            };
+            services = ResourceFilter::filter_services(services, &criteria);
+
+            // Apply grouping if specified
+            if let Some(group_by_str) = group_by {
+                let group_by = parse_group_by(&group_by_str);
+                let grouped = ResourceGrouper::group_resources(
+                    services, vec![], vec![], vec![], vec![], &group_by
+                );
+                output::print_grouped_resources(&grouped, &cli.output)?;
+            } else {
+                output::print_services(&services, &cli.output)?;
+            }
         }
         Commands::Pods {
             namespace,
             selector,
             all_namespaces,
+            status,
+            group_by,
         } => {
             let ns = if all_namespaces {
                 None
@@ -73,12 +96,33 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
                 namespace.as_deref().or(cli.namespace.as_deref())
             };
 
-            let pods = discovery.list_pods(ns, selector.as_deref()).await?;
-            output::print_pods(&pods, &cli.output)?;
+            let mut pods = discovery.list_pods(ns, selector.as_deref()).await?;
+
+            // Apply additional filtering
+            let criteria = FilterCriteria {
+                label_selector: selector,
+                status_filter: status,
+                ..Default::default()
+            };
+            pods = ResourceFilter::filter_pods(pods, &criteria);
+
+            // Apply grouping if specified
+            if let Some(group_by_str) = group_by {
+                let group_by = parse_group_by(&group_by_str);
+                let grouped = ResourceGrouper::group_resources(
+                    vec![], pods, vec![], vec![], vec![], &group_by
+                );
+                output::print_grouped_resources(&grouped, &cli.output)?;
+            } else {
+                output::print_pods(&pods, &cli.output)?;
+            }
         }
         Commands::Deployments {
             namespace,
             all_namespaces,
+            selector,
+            status,
+            group_by,
         } => {
             let ns = if all_namespaces {
                 None
@@ -86,8 +130,26 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
                 namespace.as_deref().or(cli.namespace.as_deref())
             };
 
-            let deployments = discovery.list_deployments(ns).await?;
-            output::print_deployments(&deployments, &cli.output)?;
+            let mut deployments = discovery.list_deployments(ns).await?;
+
+            // Apply filtering
+            let criteria = FilterCriteria {
+                label_selector: selector,
+                status_filter: status,
+                ..Default::default()
+            };
+            deployments = ResourceFilter::filter_deployments(deployments, &criteria);
+
+            // Apply grouping if specified
+            if let Some(group_by_str) = group_by {
+                let group_by = parse_group_by(&group_by_str);
+                let grouped = ResourceGrouper::group_resources(
+                    vec![], vec![], deployments, vec![], vec![], &group_by
+                );
+                output::print_grouped_resources(&grouped, &cli.output)?;
+            } else {
+                output::print_deployments(&deployments, &cli.output)?;
+            }
         }
         Commands::StatefulSets {
             namespace,
@@ -184,4 +246,16 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+/// Parse group-by string into GroupBy enum
+fn parse_group_by(group_by_str: &str) -> GroupBy {
+    match group_by_str.to_lowercase().as_str() {
+        "app" => GroupBy::App,
+        "tier" => GroupBy::Tier,
+        "helm-release" | "helm" => GroupBy::HelmRelease,
+        "namespace" | "ns" => GroupBy::Namespace,
+        "none" => GroupBy::None,
+        custom => GroupBy::CustomLabel(custom.to_string()),
+    }
 }

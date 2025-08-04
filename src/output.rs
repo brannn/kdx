@@ -5,6 +5,7 @@ use crate::discovery::{
     ConfigMapInfo, DaemonSetInfo, DeploymentInfo, IngressInfo, PodInfo, SecretInfo,
     ServiceDescription, ServiceHealth, ServiceInfo, ServiceTopology, StatefulSetInfo,
 };
+use crate::filtering::GroupedResources;
 use crate::error::{ExplorerError, Result};
 use colored::*;
 use tabled::{Table, Tabled};
@@ -84,6 +85,17 @@ pub fn print_daemonsets(daemonsets: &[DaemonSetInfo], format: &OutputFormat) -> 
         OutputFormat::Table => print_daemonsets_table(daemonsets),
         OutputFormat::Json => print_json(&daemonsets)?,
         OutputFormat::Yaml => print_yaml(&daemonsets)?,
+    }
+
+    Ok(())
+}
+
+/// Print grouped resources in the specified format
+pub fn print_grouped_resources(grouped: &GroupedResources, format: &OutputFormat) -> Result<()> {
+    match format {
+        OutputFormat::Table => print_grouped_resources_table(grouped),
+        OutputFormat::Json => print_json(&grouped)?,
+        OutputFormat::Yaml => print_yaml(&grouped)?,
     }
 
     Ok(())
@@ -301,6 +313,39 @@ fn print_daemonsets_table(daemonsets: &[DaemonSetInfo]) {
 
     let table = Table::new(rows);
     println!("{}", table);
+}
+
+fn print_grouped_resources_table(grouped: &GroupedResources) {
+    for (group_name, group) in &grouped.groups {
+        println!("\n=== Group: {} ({}) ===", group_name, group.group_type);
+
+        if !group.services.is_empty() {
+            println!("\nServices:");
+            print_services_table(&group.services);
+        }
+
+        if !group.deployments.is_empty() {
+            println!("\nDeployments:");
+            print_deployments_table(&group.deployments);
+        }
+
+        if !group.pods.is_empty() {
+            println!("\nPods:");
+            print_pods_table(&group.pods);
+        }
+
+        if !group.statefulsets.is_empty() {
+            println!("\nStatefulSets:");
+            print_statefulsets_table(&group.statefulsets);
+        }
+
+        if !group.daemonsets.is_empty() {
+            println!("\nDaemonSets:");
+            print_daemonsets_table(&group.daemonsets);
+        }
+
+        println!("\nTotal resources in group: {}", group.total_resources());
+    }
 }
 
 fn print_service_description_table(description: &ServiceDescription) {

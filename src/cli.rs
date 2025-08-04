@@ -40,6 +40,14 @@ pub enum Commands {
         /// Show all namespaces
         #[clap(long, short = 'A')]
         all_namespaces: bool,
+
+        /// Filter by label selector (e.g., app=web,tier!=cache)
+        #[clap(long, short = 's')]
+        selector: Option<String>,
+
+        /// Group resources by criteria (app, tier, helm-release, namespace)
+        #[clap(long, short = 'g')]
+        group_by: Option<String>,
     },
 
     /// List pods in the cluster
@@ -55,6 +63,14 @@ pub enum Commands {
         /// Show all namespaces
         #[clap(long, short = 'A')]
         all_namespaces: bool,
+
+        /// Filter by status (Running, Pending, Failed, Succeeded)
+        #[clap(long)]
+        status: Option<String>,
+
+        /// Group resources by criteria (app, tier, helm-release, namespace)
+        #[clap(long, short = 'g')]
+        group_by: Option<String>,
     },
 
     /// List deployments in the cluster
@@ -66,6 +82,18 @@ pub enum Commands {
         /// Show all namespaces
         #[clap(long, short = 'A')]
         all_namespaces: bool,
+
+        /// Filter by label selector (e.g., app=web,tier!=cache)
+        #[clap(long, short = 's')]
+        selector: Option<String>,
+
+        /// Filter by status (Ready, NotReady, PartiallyReady)
+        #[clap(long)]
+        status: Option<String>,
+
+        /// Group resources by criteria (app, tier, helm-release, namespace)
+        #[clap(long, short = 'g')]
+        group_by: Option<String>,
     },
 
     /// List statefulsets in the cluster
