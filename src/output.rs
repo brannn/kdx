@@ -528,3 +528,195 @@ fn print_health_table(health: &ServiceHealth) {
         println!("  Note: Service may not be accessible or may not have a valid cluster IP");
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::BTreeMap;
+
+    fn create_test_deployment() -> DeploymentInfo {
+        let mut labels = BTreeMap::new();
+        labels.insert("app".to_string(), "test-app".to_string());
+
+        let mut selector = BTreeMap::new();
+        selector.insert("app".to_string(), "test-app".to_string());
+
+        DeploymentInfo {
+            name: "test-deployment".to_string(),
+            namespace: "default".to_string(),
+            replicas: 3,
+            ready_replicas: 2,
+            available_replicas: 2,
+            strategy: "RollingUpdate".to_string(),
+            age: "5d".to_string(),
+            labels,
+            selector,
+        }
+    }
+
+    fn create_test_statefulset() -> StatefulSetInfo {
+        let mut labels = BTreeMap::new();
+        labels.insert("app".to_string(), "database".to_string());
+
+        let mut selector = BTreeMap::new();
+        selector.insert("app".to_string(), "database".to_string());
+
+        StatefulSetInfo {
+            name: "test-statefulset".to_string(),
+            namespace: "default".to_string(),
+            replicas: 3,
+            ready_replicas: 3,
+            current_replicas: 3,
+            age: "10d".to_string(),
+            labels,
+            selector,
+        }
+    }
+
+    fn create_test_daemonset() -> DaemonSetInfo {
+        let mut labels = BTreeMap::new();
+        labels.insert("app".to_string(), "monitoring".to_string());
+
+        let mut selector = BTreeMap::new();
+        selector.insert("app".to_string(), "monitoring".to_string());
+
+        DaemonSetInfo {
+            name: "test-daemonset".to_string(),
+            namespace: "kube-system".to_string(),
+            desired: 5,
+            current: 5,
+            ready: 4,
+            up_to_date: 5,
+            age: "30d".to_string(),
+            labels,
+            selector,
+        }
+    }
+
+    #[test]
+    fn test_print_deployments_json() {
+        let deployments = vec![create_test_deployment()];
+        let result = print_deployments(&deployments, &OutputFormat::Json);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_print_deployments_yaml() {
+        let deployments = vec![create_test_deployment()];
+        let result = print_deployments(&deployments, &OutputFormat::Yaml);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_print_deployments_table() {
+        let deployments = vec![create_test_deployment()];
+        let result = print_deployments(&deployments, &OutputFormat::Table);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_print_empty_deployments() {
+        let deployments = vec![];
+        let result = print_deployments(&deployments, &OutputFormat::Table);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_print_statefulsets_json() {
+        let statefulsets = vec![create_test_statefulset()];
+        let result = print_statefulsets(&statefulsets, &OutputFormat::Json);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_print_statefulsets_yaml() {
+        let statefulsets = vec![create_test_statefulset()];
+        let result = print_statefulsets(&statefulsets, &OutputFormat::Yaml);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_print_statefulsets_table() {
+        let statefulsets = vec![create_test_statefulset()];
+        let result = print_statefulsets(&statefulsets, &OutputFormat::Table);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_print_empty_statefulsets() {
+        let statefulsets = vec![];
+        let result = print_statefulsets(&statefulsets, &OutputFormat::Table);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_print_daemonsets_json() {
+        let daemonsets = vec![create_test_daemonset()];
+        let result = print_daemonsets(&daemonsets, &OutputFormat::Json);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_print_daemonsets_yaml() {
+        let daemonsets = vec![create_test_daemonset()];
+        let result = print_daemonsets(&daemonsets, &OutputFormat::Yaml);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_print_daemonsets_table() {
+        let daemonsets = vec![create_test_daemonset()];
+        let result = print_daemonsets(&daemonsets, &OutputFormat::Table);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_print_empty_daemonsets() {
+        let daemonsets = vec![];
+        let result = print_daemonsets(&daemonsets, &OutputFormat::Table);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_multiple_deployments_output() {
+        let deployments = vec![
+            create_test_deployment(),
+            {
+                let mut deployment = create_test_deployment();
+                deployment.name = "second-deployment".to_string();
+                deployment.namespace = "production".to_string();
+                deployment.replicas = 5;
+                deployment
+            }
+        ];
+
+        // Test all output formats with multiple deployments
+        assert!(print_deployments(&deployments, &OutputFormat::Table).is_ok());
+        assert!(print_deployments(&deployments, &OutputFormat::Json).is_ok());
+        assert!(print_deployments(&deployments, &OutputFormat::Yaml).is_ok());
+    }
+
+    #[test]
+    fn test_resource_with_zero_replicas() {
+        let mut deployment = create_test_deployment();
+        deployment.replicas = 0;
+        deployment.ready_replicas = 0;
+        deployment.available_replicas = 0;
+
+        let deployments = vec![deployment];
+        let result = print_deployments(&deployments, &OutputFormat::Table);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_resource_with_high_replica_count() {
+        let mut statefulset = create_test_statefulset();
+        statefulset.replicas = 100;
+        statefulset.ready_replicas = 95;
+        statefulset.current_replicas = 98;
+
+        let statefulsets = vec![statefulset];
+        let result = print_statefulsets(&statefulsets, &OutputFormat::Json);
+        assert!(result.is_ok());
+    }
+}

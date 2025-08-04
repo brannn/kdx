@@ -711,7 +711,6 @@ mod tests {
     }
 
     #[test]
-    #[test]
     fn test_service_port_creation() {
         let port = ServicePort {
             name: Some("http".to_string()),
@@ -724,5 +723,166 @@ mod tests {
         assert_eq!(port.port, 80);
         assert_eq!(port.target_port, "8080");
         assert_eq!(port.protocol, "TCP");
+    }
+
+    #[test]
+    fn test_deployment_info_creation() {
+        let mut labels = BTreeMap::new();
+        labels.insert("app".to_string(), "web".to_string());
+        labels.insert("version".to_string(), "v1.0.0".to_string());
+
+        let mut selector = BTreeMap::new();
+        selector.insert("app".to_string(), "web".to_string());
+
+        let deployment = DeploymentInfo {
+            name: "test-deployment".to_string(),
+            namespace: "default".to_string(),
+            replicas: 3,
+            ready_replicas: 2,
+            available_replicas: 2,
+            strategy: "RollingUpdate".to_string(),
+            age: "5d".to_string(),
+            labels: labels.clone(),
+            selector: selector.clone(),
+        };
+
+        assert_eq!(deployment.name, "test-deployment");
+        assert_eq!(deployment.namespace, "default");
+        assert_eq!(deployment.replicas, 3);
+        assert_eq!(deployment.ready_replicas, 2);
+        assert_eq!(deployment.available_replicas, 2);
+        assert_eq!(deployment.strategy, "RollingUpdate");
+        assert_eq!(deployment.age, "5d");
+        assert_eq!(deployment.labels.get("app"), Some(&"web".to_string()));
+        assert_eq!(deployment.selector.get("app"), Some(&"web".to_string()));
+    }
+
+    #[test]
+    fn test_statefulset_info_creation() {
+        let mut labels = BTreeMap::new();
+        labels.insert("app".to_string(), "database".to_string());
+
+        let mut selector = BTreeMap::new();
+        selector.insert("app".to_string(), "database".to_string());
+
+        let statefulset = StatefulSetInfo {
+            name: "test-statefulset".to_string(),
+            namespace: "default".to_string(),
+            replicas: 3,
+            ready_replicas: 3,
+            current_replicas: 3,
+            age: "10d".to_string(),
+            labels: labels.clone(),
+            selector: selector.clone(),
+        };
+
+        assert_eq!(statefulset.name, "test-statefulset");
+        assert_eq!(statefulset.namespace, "default");
+        assert_eq!(statefulset.replicas, 3);
+        assert_eq!(statefulset.ready_replicas, 3);
+        assert_eq!(statefulset.current_replicas, 3);
+        assert_eq!(statefulset.age, "10d");
+        assert_eq!(statefulset.labels.get("app"), Some(&"database".to_string()));
+    }
+
+    #[test]
+    fn test_daemonset_info_creation() {
+        let mut labels = BTreeMap::new();
+        labels.insert("app".to_string(), "monitoring".to_string());
+        labels.insert("component".to_string(), "agent".to_string());
+
+        let mut selector = BTreeMap::new();
+        selector.insert("app".to_string(), "monitoring".to_string());
+
+        let daemonset = DaemonSetInfo {
+            name: "test-daemonset".to_string(),
+            namespace: "kube-system".to_string(),
+            desired: 5,
+            current: 5,
+            ready: 4,
+            up_to_date: 5,
+            age: "30d".to_string(),
+            labels: labels.clone(),
+            selector: selector.clone(),
+        };
+
+        assert_eq!(daemonset.name, "test-daemonset");
+        assert_eq!(daemonset.namespace, "kube-system");
+        assert_eq!(daemonset.desired, 5);
+        assert_eq!(daemonset.current, 5);
+        assert_eq!(daemonset.ready, 4);
+        assert_eq!(daemonset.up_to_date, 5);
+        assert_eq!(daemonset.age, "30d");
+        assert_eq!(daemonset.labels.get("component"), Some(&"agent".to_string()));
+    }
+
+    #[test]
+    fn test_deployment_info_serialization() {
+        let deployment = DeploymentInfo {
+            name: "web-app".to_string(),
+            namespace: "production".to_string(),
+            replicas: 5,
+            ready_replicas: 5,
+            available_replicas: 5,
+            strategy: "RollingUpdate".to_string(),
+            age: "2d".to_string(),
+            labels: BTreeMap::new(),
+            selector: BTreeMap::new(),
+        };
+
+        // Test JSON serialization
+        let json = serde_json::to_string(&deployment).expect("Failed to serialize to JSON");
+        assert!(json.contains("web-app"));
+        assert!(json.contains("production"));
+        assert!(json.contains("RollingUpdate"));
+
+        // Test deserialization
+        let deserialized: DeploymentInfo = serde_json::from_str(&json).expect("Failed to deserialize from JSON");
+        assert_eq!(deserialized.name, deployment.name);
+        assert_eq!(deserialized.replicas, deployment.replicas);
+    }
+
+    #[test]
+    fn test_resource_info_with_empty_labels() {
+        let deployment = DeploymentInfo {
+            name: "minimal-deployment".to_string(),
+            namespace: "default".to_string(),
+            replicas: 1,
+            ready_replicas: 0,
+            available_replicas: 0,
+            strategy: "Recreate".to_string(),
+            age: "1h".to_string(),
+            labels: BTreeMap::new(),
+            selector: BTreeMap::new(),
+        };
+
+        assert!(deployment.labels.is_empty());
+        assert!(deployment.selector.is_empty());
+        assert_eq!(deployment.ready_replicas, 0);
+    }
+
+    #[test]
+    fn test_resource_info_with_multiple_labels() {
+        let mut labels = BTreeMap::new();
+        labels.insert("app".to_string(), "frontend".to_string());
+        labels.insert("tier".to_string(), "web".to_string());
+        labels.insert("environment".to_string(), "staging".to_string());
+        labels.insert("version".to_string(), "v2.1.0".to_string());
+
+        let statefulset = StatefulSetInfo {
+            name: "frontend-statefulset".to_string(),
+            namespace: "staging".to_string(),
+            replicas: 2,
+            ready_replicas: 2,
+            current_replicas: 2,
+            age: "7d".to_string(),
+            labels: labels.clone(),
+            selector: labels.clone(),
+        };
+
+        assert_eq!(statefulset.labels.len(), 4);
+        assert_eq!(statefulset.labels.get("tier"), Some(&"web".to_string()));
+        assert_eq!(statefulset.labels.get("environment"), Some(&"staging".to_string()));
+        assert_eq!(statefulset.selector.len(), 4);
     }
 }
