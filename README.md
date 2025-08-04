@@ -233,7 +233,7 @@ kdx topology grafana -n monitoring             # Show service topology and relat
 
 # Graph Visualization
 kdx graph -n monitoring                         # Generate service dependency graph
-kdx graph --format svg                          # Generate SVG format graph
+kdx graph --output dot                          # Generate DOT format graph
 ```
 
 ### Output Formats
@@ -341,14 +341,11 @@ kdx graph
 # Graph for specific namespace
 kdx graph -n production
 
-# Include pod relationships
-kdx graph --include-pods
+# Generate DOT format for visualization tools
+kdx graph --output dot
 
-# Highlight specific service
-kdx graph --highlight=api-service
-
-# Generate SVG format
-kdx graph --format=svg
+# Generate JSON format for programmatic use
+kdx graph --output json
 
 # Save graph to file
 kdx graph -n monitoring > services.dot
