@@ -183,22 +183,39 @@ cargo build --release
 The binary will be available at `target/release/kdx`.
 ## Usage
 
-
-## Quick Start
+### Quick Start
 
 ```bash
 # List all services in current namespace
 kdx services
 
-# Explore a specific service
-kdx describe my-service
+# Discover deployments with advanced filtering
+kdx deployments --selector app=web --group-by tier
 
-# Visualize service dependencies
-kdx graph
+# Find unused configurations
+kdx configmaps --unused
 
-# Get help
+# Explore Custom Resource Definitions
+kdx crds --with-instances
+
+# Analyze service topology
+kdx topology grafana --namespace monitoring
+
+# Get help for any command
 kdx --help
+kdx deployments --help
 ```
+
+### Available Commands
+
+kdx provides comprehensive Kubernetes resource discovery and analysis:
+
+- **Core Resources**: `services`, `pods`, `deployments`, `statefulsets`, `daemonsets`
+- **Configuration**: `configmaps`, `secrets` (with usage tracking and security analysis)
+- **Custom Resources**: `crds`, `custom-resources` (with version analysis)
+- **Service Analysis**: `describe`, `topology`, `graph` (dependency visualization)
+
+**📖 See the [User Guide](USER_GUIDE.md) for complete documentation and examples of all commands.**
 ### Core Resource Commands
 
 ```bash
@@ -476,79 +493,28 @@ Service Topology: coredns
 
 </details>
 
-### Service Discovery & Health
+### Service Discovery
 
 <details>
-<summary><strong>Click to see service listing with health status</strong></summary>
+<summary><strong>Click to see service listing</strong></summary>
 
 ```console
-$ kdx services -n production --health
+$ kdx services -n production
 
-Scanning services in production namespace...
-
-┌─────────────┬─────────────┬────────────┬───────┬─────┬────────┬──────────┐
-│ NAME        │ TYPE        │ CLUSTER-IP │ PORTS │ AGE │ HEALTH │ REPLICAS │
-├─────────────┼─────────────┼────────────┼───────┼─────┼────────┼──────────┤
-│ api-gateway │ LoadBalancer│ 10.0.1.100 │ 80    │ 5d  │ UP     │ 3/3      │
-│ auth-service│ ClusterIP   │ 10.0.1.101 │ 8080  │ 5d  │ UP     │ 2/2      │
-│ user-service│ ClusterIP   │ 10.0.1.102 │ 8080  │ 3d  │ UP     │ 2/2      │
-│ database    │ ClusterIP   │ 10.0.1.103 │ 5432  │ 10d │ UP     │ 1/1      │
-│ redis-cache │ ClusterIP   │ 10.0.1.104 │ 6379  │ 8d  │ WARN   │ 1/2      │
-│ old-service │ ClusterIP   │ 10.0.1.105 │ 8080  │ 30d │ DOWN   │ 0/1      │
-└─────────────┴─────────────┴────────────┴───────┴─────┴────────┴──────────┘
-
-Health Summary: 4 healthy, 1 warning, 1 down
-WARNING: redis-cache: 1 pod not ready
-ERROR: old-service: No healthy pods found
+NAME          TYPE           CLUSTER-IP    EXTERNAL-IP     PORT(S)        AGE
+api-gateway   LoadBalancer   10.0.1.100    203.0.113.10    80:30080/TCP   5d
+auth-service  ClusterIP      10.0.1.101    <none>          8080/TCP       5d
+user-service  ClusterIP      10.0.1.102    <none>          8080/TCP       3d
+database      ClusterIP      10.0.1.103    <none>          5432/TCP       10d
+redis-cache   ClusterIP      10.0.1.104    <none>          6379/TCP       8d
+old-service   ClusterIP      10.0.1.105    <none>          8080/TCP       30d
 
 Found 6 services in production namespace
 ```
 
 </details>
 
-### Ingress Discovery & External Access
 
-<details>
-<summary><strong>Click to see how services are exposed externally</strong></summary>
-
-```console
-$ kdx ingress -n production --show-backends
-
-Discovering external access points...
-
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                            External Access Map                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-
-Ingress Routes:
-┌─────────────────────────┬─────────────────┬─────────────────┬──────────────┐
-│ EXTERNAL URL            │ INGRESS         │ SERVICE         │ BACKEND PODS │
-├─────────────────────────┼─────────────────┼─────────────────┼──────────────┤
-│ https://api.company.com │ main-ingress    │ api-gateway:80  │ 3 ready      │
-│ https://app.company.com │ main-ingress    │ frontend:3000   │ 2 ready      │
-│ https://auth.company.com│ auth-ingress    │ auth-service:80 │ 2 ready      │
-│ https://admin.company.com│ admin-ingress  │ admin-panel:80  │ 1 ready      │
-└─────────────────────────┴─────────────────┴─────────────────┴──────────────┘
-
-LoadBalancer Services:
-┌─────────────────┬─────────────────┬─────────────────┬──────────────────────┐
-│ SERVICE         │ EXTERNAL IP     │ PORTS           │ STATUS               │
-├─────────────────┼─────────────────┼─────────────────┼──────────────────────┤
-│ api-gateway     │ 203.0.113.10    │ 80:30080/TCP    │ Ready                │
-│ monitoring-lb   │ 203.0.113.11    │ 3000:30300/TCP  │ Ready                │
-│ legacy-service  │ <pending>       │ 8080:31080/TCP  │ Provisioning         │
-└─────────────────┴─────────────────┴─────────────────┴──────────────────────┘
-
-Access Summary:
-  - 4 ingress routes configured
-  - 2 LoadBalancer services active
-  - 1 service pending external IP
-  - All backend pods healthy
-
-Use 'kdx describe <service>' for detailed routing information
-```
-
-</details>
 
 ### Service Description
 
@@ -583,10 +549,6 @@ Related Pods:
 │ api-gateway-7d4b8c9f-def34│ production│ Running │ 2/2   │ 0        │ 2d  │ 10.244.2.20│ worker-2 │
 └───────────────────────────┴───────────┴─────────┴───────┴──────────┴─────┴─────────────┴──────────┘
 
-Ingress Routes:
-  - https://api.example.com -> api-gateway:80
-  - https://api.example.com/v2 -> api-gateway:80
-
 Service is healthy and accessible
 ```
 
@@ -598,10 +560,7 @@ Service is healthy and accessible
 <summary><strong>Click to see exportable dependency graphs</strong></summary>
 
 ```console
-$ kdx graph -n microservices --include-pods --format=dot
-
-Generating comprehensive service dependency graph...
-Including pod relationships and external connections...
+$ kdx graph -n microservices --output dot
 
 digraph microservices {
   rankdir=TB;
