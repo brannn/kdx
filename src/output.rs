@@ -2,9 +2,10 @@
 
 use crate::cli::OutputFormat;
 use crate::discovery::{
-    ConfigMapInfo, IngressInfo, PodInfo, SecretInfo, ServiceDescription, ServiceHealth,
-    ServiceInfo, ServiceTopology,
+    ConfigMapInfo, CRDInfo, CustomResourceInfo, DaemonSetInfo, DeploymentInfo, IngressInfo, PodInfo, SecretInfo,
+    ServiceDescription, ServiceHealth, ServiceInfo, ServiceTopology, StatefulSetInfo,
 };
+use crate::filtering::GroupedResources;
 use crate::error::{ExplorerError, Result};
 use colored::*;
 use tabled::{Table, Tabled};
@@ -36,6 +37,163 @@ pub fn print_pods(pods: &[PodInfo], format: &OutputFormat) -> Result<()> {
         OutputFormat::Table => print_pods_table(pods),
         OutputFormat::Json => print_json(&pods)?,
         OutputFormat::Yaml => print_yaml(&pods)?,
+    }
+
+    Ok(())
+}
+
+/// Print deployments in the specified format
+pub fn print_deployments(deployments: &[DeploymentInfo], format: &OutputFormat) -> Result<()> {
+    if deployments.is_empty() {
+        println!("No deployments found");
+        return Ok(());
+    }
+
+    match format {
+        OutputFormat::Table => print_deployments_table(deployments),
+        OutputFormat::Json => print_json(&deployments)?,
+        OutputFormat::Yaml => print_yaml(&deployments)?,
+    }
+
+    Ok(())
+}
+
+/// Print statefulsets in the specified format
+pub fn print_statefulsets(statefulsets: &[StatefulSetInfo], format: &OutputFormat) -> Result<()> {
+    if statefulsets.is_empty() {
+        println!("No statefulsets found");
+        return Ok(());
+    }
+
+    match format {
+        OutputFormat::Table => print_statefulsets_table(statefulsets),
+        OutputFormat::Json => print_json(&statefulsets)?,
+        OutputFormat::Yaml => print_yaml(&statefulsets)?,
+    }
+
+    Ok(())
+}
+
+/// Print daemonsets in the specified format
+pub fn print_daemonsets(daemonsets: &[DaemonSetInfo], format: &OutputFormat) -> Result<()> {
+    if daemonsets.is_empty() {
+        println!("No daemonsets found");
+        return Ok(());
+    }
+
+    match format {
+        OutputFormat::Table => print_daemonsets_table(daemonsets),
+        OutputFormat::Json => print_json(&daemonsets)?,
+        OutputFormat::Yaml => print_yaml(&daemonsets)?,
+    }
+
+    Ok(())
+}
+
+/// Print configmaps in the specified format
+pub fn print_configmaps(configmaps: &[ConfigMapInfo], format: &OutputFormat) -> Result<()> {
+    match format {
+        OutputFormat::Table => print_configmaps_table(configmaps),
+        OutputFormat::Json => print_json(&configmaps)?,
+        OutputFormat::Yaml => print_yaml(&configmaps)?,
+    }
+
+    Ok(())
+}
+
+/// Print secrets in the specified format
+pub fn print_secrets(secrets: &[SecretInfo], format: &OutputFormat) -> Result<()> {
+    match format {
+        OutputFormat::Table => print_secrets_table(secrets),
+        OutputFormat::Json => print_json(&secrets)?,
+        OutputFormat::Yaml => print_yaml(&secrets)?,
+    }
+
+    Ok(())
+}
+
+/// Print grouped configmaps in the specified format
+pub fn print_grouped_configmaps(grouped: &GroupedResources, format: &OutputFormat) -> Result<()> {
+    match format {
+        OutputFormat::Table => print_grouped_configmaps_table(grouped),
+        OutputFormat::Json => print_json(&grouped)?,
+        OutputFormat::Yaml => print_yaml(&grouped)?,
+    }
+
+    Ok(())
+}
+
+/// Print grouped secrets in the specified format
+pub fn print_grouped_secrets(grouped: &GroupedResources, format: &OutputFormat) -> Result<()> {
+    match format {
+        OutputFormat::Table => print_grouped_secrets_table(grouped),
+        OutputFormat::Json => print_json(&grouped)?,
+        OutputFormat::Yaml => print_yaml(&grouped)?,
+    }
+
+    Ok(())
+}
+
+/// Print CRDs in the specified format
+pub fn print_crds(crds: &[CRDInfo], format: &OutputFormat, show_versions: bool) -> Result<()> {
+    if crds.is_empty() {
+        println!("No CRDs found");
+        return Ok(());
+    }
+
+    match format {
+        OutputFormat::Table => print_crds_table(crds, show_versions),
+        OutputFormat::Json => print_json(&crds)?,
+        OutputFormat::Yaml => print_yaml(&crds)?,
+    }
+
+    Ok(())
+}
+
+/// Print custom resources in the specified format
+pub fn print_custom_resources(custom_resources: &[CustomResourceInfo], format: &OutputFormat) -> Result<()> {
+    if custom_resources.is_empty() {
+        println!("No custom resources found");
+        return Ok(());
+    }
+
+    match format {
+        OutputFormat::Table => print_custom_resources_table(custom_resources),
+        OutputFormat::Json => print_json(&custom_resources)?,
+        OutputFormat::Yaml => print_yaml(&custom_resources)?,
+    }
+
+    Ok(())
+}
+
+/// Print grouped CRDs in the specified format
+pub fn print_grouped_crds(grouped: &GroupedResources, format: &OutputFormat, show_versions: bool) -> Result<()> {
+    match format {
+        OutputFormat::Table => print_grouped_crds_table(grouped, show_versions),
+        OutputFormat::Json => print_json(&grouped)?,
+        OutputFormat::Yaml => print_yaml(&grouped)?,
+    }
+
+    Ok(())
+}
+
+/// Print grouped custom resources in the specified format
+pub fn print_grouped_custom_resources(grouped: &GroupedResources, format: &OutputFormat) -> Result<()> {
+    match format {
+        OutputFormat::Table => print_grouped_custom_resources_table(grouped),
+        OutputFormat::Json => print_json(&grouped)?,
+        OutputFormat::Yaml => print_yaml(&grouped)?,
+    }
+
+    Ok(())
+}
+
+/// Print grouped resources in the specified format
+pub fn print_grouped_resources(grouped: &GroupedResources, format: &OutputFormat) -> Result<()> {
+    match format {
+        OutputFormat::Table => print_grouped_resources_table(grouped),
+        OutputFormat::Json => print_json(&grouped)?,
+        OutputFormat::Yaml => print_yaml(&grouped)?,
     }
 
     Ok(())
@@ -151,6 +309,141 @@ fn print_pods_table(pods: &[PodInfo]) {
 
     let table = Table::new(rows);
     println!("{}", table);
+}
+
+fn print_deployments_table(deployments: &[DeploymentInfo]) {
+    #[derive(Tabled)]
+    struct DeploymentRow {
+        #[tabled(rename = "NAME")]
+        name: String,
+        #[tabled(rename = "NAMESPACE")]
+        namespace: String,
+        #[tabled(rename = "READY")]
+        ready: String,
+        #[tabled(rename = "UP-TO-DATE")]
+        up_to_date: String,
+        #[tabled(rename = "AVAILABLE")]
+        available: String,
+        #[tabled(rename = "STRATEGY")]
+        strategy: String,
+        #[tabled(rename = "AGE")]
+        age: String,
+    }
+
+    let rows: Vec<DeploymentRow> = deployments
+        .iter()
+        .map(|d| DeploymentRow {
+            name: d.name.clone(),
+            namespace: d.namespace.clone(),
+            ready: format!("{}/{}", d.ready_replicas, d.replicas),
+            up_to_date: d.ready_replicas.to_string(),
+            available: d.available_replicas.to_string(),
+            strategy: d.strategy.clone(),
+            age: d.age.clone(),
+        })
+        .collect();
+
+    let table = Table::new(rows);
+    println!("{}", table);
+}
+
+fn print_statefulsets_table(statefulsets: &[StatefulSetInfo]) {
+    #[derive(Tabled)]
+    struct StatefulSetRow {
+        #[tabled(rename = "NAME")]
+        name: String,
+        #[tabled(rename = "NAMESPACE")]
+        namespace: String,
+        #[tabled(rename = "READY")]
+        ready: String,
+        #[tabled(rename = "CURRENT")]
+        current: String,
+        #[tabled(rename = "AGE")]
+        age: String,
+    }
+
+    let rows: Vec<StatefulSetRow> = statefulsets
+        .iter()
+        .map(|s| StatefulSetRow {
+            name: s.name.clone(),
+            namespace: s.namespace.clone(),
+            ready: format!("{}/{}", s.ready_replicas, s.replicas),
+            current: s.current_replicas.to_string(),
+            age: s.age.clone(),
+        })
+        .collect();
+
+    let table = Table::new(rows);
+    println!("{}", table);
+}
+
+fn print_daemonsets_table(daemonsets: &[DaemonSetInfo]) {
+    #[derive(Tabled)]
+    struct DaemonSetRow {
+        #[tabled(rename = "NAME")]
+        name: String,
+        #[tabled(rename = "NAMESPACE")]
+        namespace: String,
+        #[tabled(rename = "DESIRED")]
+        desired: String,
+        #[tabled(rename = "CURRENT")]
+        current: String,
+        #[tabled(rename = "READY")]
+        ready: String,
+        #[tabled(rename = "UP-TO-DATE")]
+        up_to_date: String,
+        #[tabled(rename = "AGE")]
+        age: String,
+    }
+
+    let rows: Vec<DaemonSetRow> = daemonsets
+        .iter()
+        .map(|d| DaemonSetRow {
+            name: d.name.clone(),
+            namespace: d.namespace.clone(),
+            desired: d.desired.to_string(),
+            current: d.current.to_string(),
+            ready: d.ready.to_string(),
+            up_to_date: d.up_to_date.to_string(),
+            age: d.age.clone(),
+        })
+        .collect();
+
+    let table = Table::new(rows);
+    println!("{}", table);
+}
+
+fn print_grouped_resources_table(grouped: &GroupedResources) {
+    for (group_name, group) in &grouped.groups {
+        println!("\n=== Group: {} ({}) ===", group_name, group.group_type);
+
+        if !group.services.is_empty() {
+            println!("\nServices:");
+            print_services_table(&group.services);
+        }
+
+        if !group.deployments.is_empty() {
+            println!("\nDeployments:");
+            print_deployments_table(&group.deployments);
+        }
+
+        if !group.pods.is_empty() {
+            println!("\nPods:");
+            print_pods_table(&group.pods);
+        }
+
+        if !group.statefulsets.is_empty() {
+            println!("\nStatefulSets:");
+            print_statefulsets_table(&group.statefulsets);
+        }
+
+        if !group.daemonsets.is_empty() {
+            println!("\nDaemonSets:");
+            print_daemonsets_table(&group.daemonsets);
+        }
+
+        println!("\nTotal resources in group: {}", group.total_resources());
+    }
 }
 
 fn print_service_description_table(description: &ServiceDescription) {
@@ -318,11 +611,11 @@ fn print_configuration_table(configmaps: &[ConfigMapInfo], secrets: &[SecretInfo
     if !configmaps.is_empty() {
         println!("  ConfigMaps:");
         for cm in configmaps {
-            let mount_info = cm
-                .mount_path
-                .as_ref()
-                .map(|path| format!(" (mounted at {})", path))
-                .unwrap_or_else(|| " (environment variable)".to_string());
+            let mount_info = if cm.mount_paths.is_empty() {
+                " (environment variable)".to_string()
+            } else {
+                format!(" (mounted at {})", cm.mount_paths.join(", "))
+            };
             println!(
                 "    {} (namespace: {}){}",
                 cm.name.cyan(),
@@ -335,11 +628,11 @@ fn print_configuration_table(configmaps: &[ConfigMapInfo], secrets: &[SecretInfo
     if !secrets.is_empty() {
         println!("  Secrets:");
         for secret in secrets {
-            let mount_info = secret
-                .mount_path
-                .as_ref()
-                .map(|path| format!(" (mounted at {})", path))
-                .unwrap_or_else(|| " (environment variable)".to_string());
+            let mount_info = if secret.mount_paths.is_empty() {
+                " (environment variable)".to_string()
+            } else {
+                format!(" (mounted at {})", secret.mount_paths.join(", "))
+            };
             println!(
                 "    {} (namespace: {}, type: {}){}",
                 secret.name.yellow(),
@@ -376,5 +669,428 @@ fn print_health_table(health: &ServiceHealth) {
 
     if !health.overall_healthy {
         println!("  Note: Service may not be accessible or may not have a valid cluster IP");
+    }
+}
+
+fn print_configmaps_table(configmaps: &[ConfigMapInfo]) {
+    if configmaps.is_empty() {
+        println!("No configmaps found");
+        return;
+    }
+
+    #[derive(Tabled)]
+    struct ConfigMapRow {
+        #[tabled(rename = "NAME")]
+        name: String,
+        #[tabled(rename = "NAMESPACE")]
+        namespace: String,
+        #[tabled(rename = "DATA")]
+        data_count: String,
+        #[tabled(rename = "AGE")]
+        age: String,
+        #[tabled(rename = "USED BY")]
+        used_by: String,
+    }
+
+    let rows: Vec<ConfigMapRow> = configmaps
+        .iter()
+        .map(|cm| ConfigMapRow {
+            name: cm.name.clone(),
+            namespace: cm.namespace.clone(),
+            data_count: cm.data_keys.len().to_string(),
+            age: cm.age.clone(),
+            used_by: if cm.used_by.is_empty() {
+                "None".to_string()
+            } else {
+                format!("{} resources", cm.used_by.len())
+            },
+        })
+        .collect();
+
+    let table = Table::new(rows);
+    println!("{}", table);
+}
+
+fn print_secrets_table(secrets: &[SecretInfo]) {
+    if secrets.is_empty() {
+        println!("No secrets found");
+        return;
+    }
+
+    #[derive(Tabled)]
+    struct SecretRow {
+        #[tabled(rename = "NAME")]
+        name: String,
+        #[tabled(rename = "NAMESPACE")]
+        namespace: String,
+        #[tabled(rename = "TYPE")]
+        secret_type: String,
+        #[tabled(rename = "DATA")]
+        data_count: String,
+        #[tabled(rename = "AGE")]
+        age: String,
+        #[tabled(rename = "USED BY")]
+        used_by: String,
+    }
+
+    let rows: Vec<SecretRow> = secrets
+        .iter()
+        .map(|s| SecretRow {
+            name: s.name.clone(),
+            namespace: s.namespace.clone(),
+            secret_type: s.secret_type.clone(),
+            data_count: s.data_keys.len().to_string(),
+            age: s.age.clone(),
+            used_by: if s.used_by.is_empty() {
+                "None".to_string()
+            } else {
+                format!("{} resources", s.used_by.len())
+            },
+        })
+        .collect();
+
+    let table = Table::new(rows);
+    println!("{}", table);
+}
+
+fn print_grouped_configmaps_table(grouped: &GroupedResources) {
+    for (group_name, group) in &grouped.groups {
+        println!("\n=== ConfigMap Group: {} ({}) ===", group_name, group.group_type);
+
+        if !group.configmaps.is_empty() {
+            print_configmaps_table(&group.configmaps);
+        } else {
+            println!("No configmaps in this group");
+        }
+
+        println!("Total configmaps in group: {}", group.configmaps.len());
+    }
+}
+
+fn print_grouped_secrets_table(grouped: &GroupedResources) {
+    for (group_name, group) in &grouped.groups {
+        println!("\n=== Secret Group: {} ({}) ===", group_name, group.group_type);
+
+        if !group.secrets.is_empty() {
+            print_secrets_table(&group.secrets);
+        } else {
+            println!("No secrets in this group");
+        }
+
+        println!("Total secrets in group: {}", group.secrets.len());
+    }
+}
+
+fn print_crds_table(crds: &[CRDInfo], show_versions: bool) {
+    if crds.is_empty() {
+        println!("No CRDs found");
+        return;
+    }
+
+    #[derive(Tabled)]
+    struct CRDRow {
+        #[tabled(rename = "NAME")]
+        name: String,
+        #[tabled(rename = "GROUP")]
+        group: String,
+        #[tabled(rename = "VERSION")]
+        version: String,
+        #[tabled(rename = "KIND")]
+        kind: String,
+        #[tabled(rename = "SCOPE")]
+        scope: String,
+        #[tabled(rename = "INSTANCES")]
+        instances: String,
+        #[tabled(rename = "AGE")]
+        age: String,
+    }
+
+    let rows: Vec<CRDRow> = crds
+        .iter()
+        .map(|crd| CRDRow {
+            name: crd.name.clone(),
+            group: crd.group.clone(),
+            version: crd.version.clone(),
+            kind: crd.kind.clone(),
+            scope: crd.scope.clone(),
+            instances: crd.instance_count.to_string(),
+            age: crd.age.clone(),
+        })
+        .collect();
+
+    let table = Table::new(rows);
+    println!("{}", table);
+
+    if show_versions {
+        for crd in crds {
+            if crd.versions.len() > 1 {
+                println!("\nVersions for {}:", crd.name.cyan());
+                for version in &crd.versions {
+                    let status = if version.storage {
+                        "storage".green()
+                    } else if version.served {
+                        "served".yellow()
+                    } else {
+                        "deprecated".red()
+                    };
+                    println!("  {} ({})", version.name, status);
+                }
+            }
+        }
+    }
+}
+
+fn print_custom_resources_table(custom_resources: &[CustomResourceInfo]) {
+    if custom_resources.is_empty() {
+        println!("No custom resources found");
+        return;
+    }
+
+    #[derive(Tabled)]
+    struct CustomResourceRow {
+        #[tabled(rename = "NAME")]
+        name: String,
+        #[tabled(rename = "NAMESPACE")]
+        namespace: String,
+        #[tabled(rename = "KIND")]
+        kind: String,
+        #[tabled(rename = "VERSION")]
+        version: String,
+        #[tabled(rename = "AGE")]
+        age: String,
+    }
+
+    let rows: Vec<CustomResourceRow> = custom_resources
+        .iter()
+        .map(|cr| CustomResourceRow {
+            name: cr.name.clone(),
+            namespace: cr.namespace.clone().unwrap_or_else(|| "cluster".to_string()),
+            kind: cr.kind.clone(),
+            version: cr.version.clone(),
+            age: cr.age.clone(),
+        })
+        .collect();
+
+    let table = Table::new(rows);
+    println!("{}", table);
+}
+
+fn print_grouped_crds_table(grouped: &GroupedResources, show_versions: bool) {
+    for (group_name, group) in &grouped.groups {
+        println!("\n=== CRD Group: {} ({}) ===", group_name, group.group_type);
+
+        if !group.crds.is_empty() {
+            print_crds_table(&group.crds, show_versions);
+        } else {
+            println!("No CRDs in this group");
+        }
+
+        println!("Total CRDs in group: {}", group.crds.len());
+    }
+}
+
+fn print_grouped_custom_resources_table(grouped: &GroupedResources) {
+    for (group_name, group) in &grouped.groups {
+        println!("\n=== Custom Resource Group: {} ({}) ===", group_name, group.group_type);
+
+        if !group.custom_resources.is_empty() {
+            print_custom_resources_table(&group.custom_resources);
+        } else {
+            println!("No custom resources in this group");
+        }
+
+        println!("Total custom resources in group: {}", group.custom_resources.len());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::BTreeMap;
+
+    fn create_test_deployment() -> DeploymentInfo {
+        let mut labels = BTreeMap::new();
+        labels.insert("app".to_string(), "test-app".to_string());
+
+        let mut selector = BTreeMap::new();
+        selector.insert("app".to_string(), "test-app".to_string());
+
+        DeploymentInfo {
+            name: "test-deployment".to_string(),
+            namespace: "default".to_string(),
+            replicas: 3,
+            ready_replicas: 2,
+            available_replicas: 2,
+            strategy: "RollingUpdate".to_string(),
+            age: "5d".to_string(),
+            labels,
+            selector,
+        }
+    }
+
+    fn create_test_statefulset() -> StatefulSetInfo {
+        let mut labels = BTreeMap::new();
+        labels.insert("app".to_string(), "database".to_string());
+
+        let mut selector = BTreeMap::new();
+        selector.insert("app".to_string(), "database".to_string());
+
+        StatefulSetInfo {
+            name: "test-statefulset".to_string(),
+            namespace: "default".to_string(),
+            replicas: 3,
+            ready_replicas: 3,
+            current_replicas: 3,
+            age: "10d".to_string(),
+            labels,
+            selector,
+        }
+    }
+
+    fn create_test_daemonset() -> DaemonSetInfo {
+        let mut labels = BTreeMap::new();
+        labels.insert("app".to_string(), "monitoring".to_string());
+
+        let mut selector = BTreeMap::new();
+        selector.insert("app".to_string(), "monitoring".to_string());
+
+        DaemonSetInfo {
+            name: "test-daemonset".to_string(),
+            namespace: "kube-system".to_string(),
+            desired: 5,
+            current: 5,
+            ready: 4,
+            up_to_date: 5,
+            age: "30d".to_string(),
+            labels,
+            selector,
+        }
+    }
+
+    #[test]
+    fn test_print_deployments_json() {
+        let deployments = vec![create_test_deployment()];
+        let result = print_deployments(&deployments, &OutputFormat::Json);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_print_deployments_yaml() {
+        let deployments = vec![create_test_deployment()];
+        let result = print_deployments(&deployments, &OutputFormat::Yaml);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_print_deployments_table() {
+        let deployments = vec![create_test_deployment()];
+        let result = print_deployments(&deployments, &OutputFormat::Table);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_print_empty_deployments() {
+        let deployments = vec![];
+        let result = print_deployments(&deployments, &OutputFormat::Table);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_print_statefulsets_json() {
+        let statefulsets = vec![create_test_statefulset()];
+        let result = print_statefulsets(&statefulsets, &OutputFormat::Json);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_print_statefulsets_yaml() {
+        let statefulsets = vec![create_test_statefulset()];
+        let result = print_statefulsets(&statefulsets, &OutputFormat::Yaml);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_print_statefulsets_table() {
+        let statefulsets = vec![create_test_statefulset()];
+        let result = print_statefulsets(&statefulsets, &OutputFormat::Table);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_print_empty_statefulsets() {
+        let statefulsets = vec![];
+        let result = print_statefulsets(&statefulsets, &OutputFormat::Table);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_print_daemonsets_json() {
+        let daemonsets = vec![create_test_daemonset()];
+        let result = print_daemonsets(&daemonsets, &OutputFormat::Json);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_print_daemonsets_yaml() {
+        let daemonsets = vec![create_test_daemonset()];
+        let result = print_daemonsets(&daemonsets, &OutputFormat::Yaml);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_print_daemonsets_table() {
+        let daemonsets = vec![create_test_daemonset()];
+        let result = print_daemonsets(&daemonsets, &OutputFormat::Table);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_print_empty_daemonsets() {
+        let daemonsets = vec![];
+        let result = print_daemonsets(&daemonsets, &OutputFormat::Table);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_multiple_deployments_output() {
+        let deployments = vec![
+            create_test_deployment(),
+            {
+                let mut deployment = create_test_deployment();
+                deployment.name = "second-deployment".to_string();
+                deployment.namespace = "production".to_string();
+                deployment.replicas = 5;
+                deployment
+            }
+        ];
+
+        // Test all output formats with multiple deployments
+        assert!(print_deployments(&deployments, &OutputFormat::Table).is_ok());
+        assert!(print_deployments(&deployments, &OutputFormat::Json).is_ok());
+        assert!(print_deployments(&deployments, &OutputFormat::Yaml).is_ok());
+    }
+
+    #[test]
+    fn test_resource_with_zero_replicas() {
+        let mut deployment = create_test_deployment();
+        deployment.replicas = 0;
+        deployment.ready_replicas = 0;
+        deployment.available_replicas = 0;
+
+        let deployments = vec![deployment];
+        let result = print_deployments(&deployments, &OutputFormat::Table);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_resource_with_high_replica_count() {
+        let mut statefulset = create_test_statefulset();
+        statefulset.replicas = 100;
+        statefulset.ready_replicas = 95;
+        statefulset.current_replicas = 98;
+
+        let statefulsets = vec![statefulset];
+        let result = print_statefulsets(&statefulsets, &OutputFormat::Json);
+        assert!(result.is_ok());
     }
 }
