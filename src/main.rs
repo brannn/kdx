@@ -76,6 +76,45 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
             let pods = discovery.list_pods(ns, selector.as_deref()).await?;
             output::print_pods(&pods, &cli.output)?;
         }
+        Commands::Deployments {
+            namespace,
+            all_namespaces,
+        } => {
+            let ns = if all_namespaces {
+                None
+            } else {
+                namespace.as_deref().or(cli.namespace.as_deref())
+            };
+
+            let deployments = discovery.list_deployments(ns).await?;
+            output::print_deployments(&deployments, &cli.output)?;
+        }
+        Commands::StatefulSets {
+            namespace,
+            all_namespaces,
+        } => {
+            let ns = if all_namespaces {
+                None
+            } else {
+                namespace.as_deref().or(cli.namespace.as_deref())
+            };
+
+            let statefulsets = discovery.list_statefulsets(ns).await?;
+            output::print_statefulsets(&statefulsets, &cli.output)?;
+        }
+        Commands::DaemonSets {
+            namespace,
+            all_namespaces,
+        } => {
+            let ns = if all_namespaces {
+                None
+            } else {
+                namespace.as_deref().or(cli.namespace.as_deref())
+            };
+
+            let daemonsets = discovery.list_daemonsets(ns).await?;
+            output::print_daemonsets(&daemonsets, &cli.output)?;
+        }
         Commands::Describe { service, namespace } => {
             let ns = namespace
                 .as_deref()

@@ -2,8 +2,8 @@
 
 use crate::cli::OutputFormat;
 use crate::discovery::{
-    ConfigMapInfo, IngressInfo, PodInfo, SecretInfo, ServiceDescription, ServiceHealth,
-    ServiceInfo, ServiceTopology,
+    ConfigMapInfo, DaemonSetInfo, DeploymentInfo, IngressInfo, PodInfo, SecretInfo,
+    ServiceDescription, ServiceHealth, ServiceInfo, ServiceTopology, StatefulSetInfo,
 };
 use crate::error::{ExplorerError, Result};
 use colored::*;
@@ -36,6 +36,54 @@ pub fn print_pods(pods: &[PodInfo], format: &OutputFormat) -> Result<()> {
         OutputFormat::Table => print_pods_table(pods),
         OutputFormat::Json => print_json(&pods)?,
         OutputFormat::Yaml => print_yaml(&pods)?,
+    }
+
+    Ok(())
+}
+
+/// Print deployments in the specified format
+pub fn print_deployments(deployments: &[DeploymentInfo], format: &OutputFormat) -> Result<()> {
+    if deployments.is_empty() {
+        println!("No deployments found");
+        return Ok(());
+    }
+
+    match format {
+        OutputFormat::Table => print_deployments_table(deployments),
+        OutputFormat::Json => print_json(&deployments)?,
+        OutputFormat::Yaml => print_yaml(&deployments)?,
+    }
+
+    Ok(())
+}
+
+/// Print statefulsets in the specified format
+pub fn print_statefulsets(statefulsets: &[StatefulSetInfo], format: &OutputFormat) -> Result<()> {
+    if statefulsets.is_empty() {
+        println!("No statefulsets found");
+        return Ok(());
+    }
+
+    match format {
+        OutputFormat::Table => print_statefulsets_table(statefulsets),
+        OutputFormat::Json => print_json(&statefulsets)?,
+        OutputFormat::Yaml => print_yaml(&statefulsets)?,
+    }
+
+    Ok(())
+}
+
+/// Print daemonsets in the specified format
+pub fn print_daemonsets(daemonsets: &[DaemonSetInfo], format: &OutputFormat) -> Result<()> {
+    if daemonsets.is_empty() {
+        println!("No daemonsets found");
+        return Ok(());
+    }
+
+    match format {
+        OutputFormat::Table => print_daemonsets_table(daemonsets),
+        OutputFormat::Json => print_json(&daemonsets)?,
+        OutputFormat::Yaml => print_yaml(&daemonsets)?,
     }
 
     Ok(())
@@ -146,6 +194,108 @@ fn print_pods_table(pods: &[PodInfo]) {
                 ip: pod.pod_ip.clone().unwrap_or_else(|| "None".to_string()),
                 node: pod.node_name.clone().unwrap_or_else(|| "None".to_string()),
             }
+        })
+        .collect();
+
+    let table = Table::new(rows);
+    println!("{}", table);
+}
+
+fn print_deployments_table(deployments: &[DeploymentInfo]) {
+    #[derive(Tabled)]
+    struct DeploymentRow {
+        #[tabled(rename = "NAME")]
+        name: String,
+        #[tabled(rename = "NAMESPACE")]
+        namespace: String,
+        #[tabled(rename = "READY")]
+        ready: String,
+        #[tabled(rename = "UP-TO-DATE")]
+        up_to_date: String,
+        #[tabled(rename = "AVAILABLE")]
+        available: String,
+        #[tabled(rename = "STRATEGY")]
+        strategy: String,
+        #[tabled(rename = "AGE")]
+        age: String,
+    }
+
+    let rows: Vec<DeploymentRow> = deployments
+        .iter()
+        .map(|d| DeploymentRow {
+            name: d.name.clone(),
+            namespace: d.namespace.clone(),
+            ready: format!("{}/{}", d.ready_replicas, d.replicas),
+            up_to_date: d.ready_replicas.to_string(),
+            available: d.available_replicas.to_string(),
+            strategy: d.strategy.clone(),
+            age: d.age.clone(),
+        })
+        .collect();
+
+    let table = Table::new(rows);
+    println!("{}", table);
+}
+
+fn print_statefulsets_table(statefulsets: &[StatefulSetInfo]) {
+    #[derive(Tabled)]
+    struct StatefulSetRow {
+        #[tabled(rename = "NAME")]
+        name: String,
+        #[tabled(rename = "NAMESPACE")]
+        namespace: String,
+        #[tabled(rename = "READY")]
+        ready: String,
+        #[tabled(rename = "CURRENT")]
+        current: String,
+        #[tabled(rename = "AGE")]
+        age: String,
+    }
+
+    let rows: Vec<StatefulSetRow> = statefulsets
+        .iter()
+        .map(|s| StatefulSetRow {
+            name: s.name.clone(),
+            namespace: s.namespace.clone(),
+            ready: format!("{}/{}", s.ready_replicas, s.replicas),
+            current: s.current_replicas.to_string(),
+            age: s.age.clone(),
+        })
+        .collect();
+
+    let table = Table::new(rows);
+    println!("{}", table);
+}
+
+fn print_daemonsets_table(daemonsets: &[DaemonSetInfo]) {
+    #[derive(Tabled)]
+    struct DaemonSetRow {
+        #[tabled(rename = "NAME")]
+        name: String,
+        #[tabled(rename = "NAMESPACE")]
+        namespace: String,
+        #[tabled(rename = "DESIRED")]
+        desired: String,
+        #[tabled(rename = "CURRENT")]
+        current: String,
+        #[tabled(rename = "READY")]
+        ready: String,
+        #[tabled(rename = "UP-TO-DATE")]
+        up_to_date: String,
+        #[tabled(rename = "AGE")]
+        age: String,
+    }
+
+    let rows: Vec<DaemonSetRow> = daemonsets
+        .iter()
+        .map(|d| DaemonSetRow {
+            name: d.name.clone(),
+            namespace: d.namespace.clone(),
+            desired: d.desired.to_string(),
+            current: d.current.to_string(),
+            ready: d.ready.to_string(),
+            up_to_date: d.up_to_date.to_string(),
+            age: d.age.clone(),
         })
         .collect();
 

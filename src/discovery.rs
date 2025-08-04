@@ -1,6 +1,7 @@
 //! Kubernetes resource discovery and analysis
 
 use crate::error::{ExplorerError, Result};
+use k8s_openapi::api::apps::v1::{DaemonSet, Deployment, StatefulSet};
 use k8s_openapi::api::core::v1::{ConfigMap, Pod, Secret, Service};
 use k8s_openapi::api::networking::v1::Ingress;
 use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
@@ -217,6 +218,63 @@ impl DiscoveryEngine {
         Ok((found_configmaps, found_secrets))
     }
 
+    /// List deployments in the specified namespace (or all namespaces if None)
+    pub async fn list_deployments(&self, namespace: Option<&str>) -> Result<Vec<DeploymentInfo>> {
+        let deployments: Api<Deployment> = match namespace {
+            Some(ns) => Api::namespaced(self.client.clone(), ns),
+            None => Api::all(self.client.clone()),
+        };
+
+        let deployment_list = deployments.list(&Default::default()).await?;
+
+        let mut deployment_infos = Vec::new();
+        for deployment in deployment_list.items {
+            if let Some(deployment_info) = self.convert_deployment_to_info(deployment).await {
+                deployment_infos.push(deployment_info);
+            }
+        }
+
+        Ok(deployment_infos)
+    }
+
+    /// List statefulsets in the specified namespace (or all namespaces if None)
+    pub async fn list_statefulsets(&self, namespace: Option<&str>) -> Result<Vec<StatefulSetInfo>> {
+        let statefulsets: Api<StatefulSet> = match namespace {
+            Some(ns) => Api::namespaced(self.client.clone(), ns),
+            None => Api::all(self.client.clone()),
+        };
+
+        let statefulset_list = statefulsets.list(&Default::default()).await?;
+
+        let mut statefulset_infos = Vec::new();
+        for statefulset in statefulset_list.items {
+            if let Some(statefulset_info) = self.convert_statefulset_to_info(statefulset).await {
+                statefulset_infos.push(statefulset_info);
+            }
+        }
+
+        Ok(statefulset_infos)
+    }
+
+    /// List daemonsets in the specified namespace (or all namespaces if None)
+    pub async fn list_daemonsets(&self, namespace: Option<&str>) -> Result<Vec<DaemonSetInfo>> {
+        let daemonsets: Api<DaemonSet> = match namespace {
+            Some(ns) => Api::namespaced(self.client.clone(), ns),
+            None => Api::all(self.client.clone()),
+        };
+
+        let daemonset_list = daemonsets.list(&Default::default()).await?;
+
+        let mut daemonset_infos = Vec::new();
+        for daemonset in daemonset_list.items {
+            if let Some(daemonset_info) = self.convert_daemonset_to_info(daemonset).await {
+                daemonset_infos.push(daemonset_info);
+            }
+        }
+
+        Ok(daemonset_infos)
+    }
+
     /// Check the health of a service by testing its cluster IP endpoints
     pub async fn check_service_health(
         &self,
@@ -379,6 +437,96 @@ impl DiscoveryEngine {
             None
         }
     }
+
+    async fn convert_deployment_to_info(&self, deployment: Deployment) -> Option<DeploymentInfo> {
+        let metadata = deployment.metadata;
+        let spec = deployment.spec?;
+        let status = deployment.status;
+
+        let name = metadata.name?;
+        let namespace = metadata.namespace.unwrap_or_else(|| "default".to_string());
+        let labels = metadata.labels.unwrap_or_default();
+
+        let replicas = spec.replicas.unwrap_or(1);
+        let ready_replicas = status.as_ref().and_then(|s| s.ready_replicas).unwrap_or(0);
+        let available_replicas = status.as_ref().and_then(|s| s.available_replicas).unwrap_or(0);
+
+        let strategy = spec.strategy
+            .as_ref()
+            .and_then(|s| s.type_.as_ref())
+            .unwrap_or(&"RollingUpdate".to_string())
+            .clone();
+
+        let selector = spec.selector.match_labels.unwrap_or_default();
+
+        Some(DeploymentInfo {
+            name,
+            namespace,
+            replicas,
+            ready_replicas,
+            available_replicas,
+            strategy,
+            age: "Unknown".to_string(), // TODO: Calculate from creation timestamp
+            labels,
+            selector,
+        })
+    }
+
+    async fn convert_statefulset_to_info(&self, statefulset: StatefulSet) -> Option<StatefulSetInfo> {
+        let metadata = statefulset.metadata;
+        let spec = statefulset.spec?;
+        let status = statefulset.status;
+
+        let name = metadata.name?;
+        let namespace = metadata.namespace.unwrap_or_else(|| "default".to_string());
+        let labels = metadata.labels.unwrap_or_default();
+
+        let replicas = spec.replicas.unwrap_or(1);
+        let ready_replicas = status.as_ref().and_then(|s| s.ready_replicas).unwrap_or(0);
+        let current_replicas = status.as_ref().and_then(|s| s.current_replicas).unwrap_or(0);
+
+        let selector = spec.selector.match_labels.unwrap_or_default();
+
+        Some(StatefulSetInfo {
+            name,
+            namespace,
+            replicas,
+            ready_replicas,
+            current_replicas,
+            age: "Unknown".to_string(), // TODO: Calculate from creation timestamp
+            labels,
+            selector,
+        })
+    }
+
+    async fn convert_daemonset_to_info(&self, daemonset: DaemonSet) -> Option<DaemonSetInfo> {
+        let metadata = daemonset.metadata;
+        let spec = daemonset.spec?;
+        let status = daemonset.status;
+
+        let name = metadata.name?;
+        let namespace = metadata.namespace.unwrap_or_else(|| "default".to_string());
+        let labels = metadata.labels.unwrap_or_default();
+
+        let desired = status.as_ref().map(|s| s.desired_number_scheduled).unwrap_or(0);
+        let current = status.as_ref().map(|s| s.current_number_scheduled).unwrap_or(0);
+        let ready = status.as_ref().map(|s| s.number_ready).unwrap_or(0);
+        let up_to_date = status.as_ref().and_then(|s| s.updated_number_scheduled).unwrap_or(0);
+
+        let selector = spec.selector.match_labels.unwrap_or_default();
+
+        Some(DaemonSetInfo {
+            name,
+            namespace,
+            desired,
+            current,
+            ready,
+            up_to_date,
+            age: "Unknown".to_string(), // TODO: Calculate from creation timestamp
+            labels,
+            selector,
+        })
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -442,6 +590,44 @@ pub struct SecretInfo {
     pub namespace: String,
     pub mount_path: Option<String>,
     pub secret_type: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeploymentInfo {
+    pub name: String,
+    pub namespace: String,
+    pub replicas: i32,
+    pub ready_replicas: i32,
+    pub available_replicas: i32,
+    pub strategy: String,
+    pub age: String,
+    pub labels: BTreeMap<String, String>,
+    pub selector: BTreeMap<String, String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StatefulSetInfo {
+    pub name: String,
+    pub namespace: String,
+    pub replicas: i32,
+    pub ready_replicas: i32,
+    pub current_replicas: i32,
+    pub age: String,
+    pub labels: BTreeMap<String, String>,
+    pub selector: BTreeMap<String, String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DaemonSetInfo {
+    pub name: String,
+    pub namespace: String,
+    pub desired: i32,
+    pub current: i32,
+    pub ready: i32,
+    pub up_to_date: i32,
+    pub age: String,
+    pub labels: BTreeMap<String, String>,
+    pub selector: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -57,6 +57,39 @@ pub enum Commands {
         all_namespaces: bool,
     },
 
+    /// List deployments in the cluster
+    Deployments {
+        /// Show deployments from a specific namespace
+        #[clap(long, short = 'n')]
+        namespace: Option<String>,
+
+        /// Show all namespaces
+        #[clap(long, short = 'A')]
+        all_namespaces: bool,
+    },
+
+    /// List statefulsets in the cluster
+    StatefulSets {
+        /// Show statefulsets from a specific namespace
+        #[clap(long, short = 'n')]
+        namespace: Option<String>,
+
+        /// Show all namespaces
+        #[clap(long, short = 'A')]
+        all_namespaces: bool,
+    },
+
+    /// List daemonsets in the cluster
+    DaemonSets {
+        /// Show daemonsets from a specific namespace
+        #[clap(long, short = 'n')]
+        namespace: Option<String>,
+
+        /// Show all namespaces
+        #[clap(long, short = 'A')]
+        all_namespaces: bool,
+    },
+
     /// Describe a service and its relationships
     Describe {
         /// Service name to describe
