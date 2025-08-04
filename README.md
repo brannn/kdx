@@ -2,6 +2,7 @@
 
 
 [![Build Status](https://github.com/brannn/kdx/actions/workflows/ci.yml/badge.svg)](https://github.com/brannn/kdx/actions)
+[![Tests](https://img.shields.io/badge/tests-23%20passing-brightgreen.svg)](https://github.com/brannn/kdx/actions)
 [![Release](https://img.shields.io/github/v/release/brannn/kdx?label=release)](https://github.com/brannn/kdx/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/rust-1.70+-blue.svg)](https://www.rust-lang.org)
