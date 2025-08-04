@@ -2,7 +2,7 @@
 
 use crate::cli::OutputFormat;
 use crate::discovery::{
-    ConfigMapInfo, DaemonSetInfo, DeploymentInfo, IngressInfo, PodInfo, SecretInfo,
+    ConfigMapInfo, CRDInfo, CustomResourceInfo, DaemonSetInfo, DeploymentInfo, IngressInfo, PodInfo, SecretInfo,
     ServiceDescription, ServiceHealth, ServiceInfo, ServiceTopology, StatefulSetInfo,
 };
 use crate::filtering::GroupedResources;
@@ -127,6 +127,60 @@ pub fn print_grouped_configmaps(grouped: &GroupedResources, format: &OutputForma
 pub fn print_grouped_secrets(grouped: &GroupedResources, format: &OutputFormat) -> Result<()> {
     match format {
         OutputFormat::Table => print_grouped_secrets_table(grouped),
+        OutputFormat::Json => print_json(&grouped)?,
+        OutputFormat::Yaml => print_yaml(&grouped)?,
+    }
+
+    Ok(())
+}
+
+/// Print CRDs in the specified format
+pub fn print_crds(crds: &[CRDInfo], format: &OutputFormat, show_versions: bool) -> Result<()> {
+    if crds.is_empty() {
+        println!("No CRDs found");
+        return Ok(());
+    }
+
+    match format {
+        OutputFormat::Table => print_crds_table(crds, show_versions),
+        OutputFormat::Json => print_json(&crds)?,
+        OutputFormat::Yaml => print_yaml(&crds)?,
+    }
+
+    Ok(())
+}
+
+/// Print custom resources in the specified format
+pub fn print_custom_resources(custom_resources: &[CustomResourceInfo], format: &OutputFormat) -> Result<()> {
+    if custom_resources.is_empty() {
+        println!("No custom resources found");
+        return Ok(());
+    }
+
+    match format {
+        OutputFormat::Table => print_custom_resources_table(custom_resources),
+        OutputFormat::Json => print_json(&custom_resources)?,
+        OutputFormat::Yaml => print_yaml(&custom_resources)?,
+    }
+
+    Ok(())
+}
+
+/// Print grouped CRDs in the specified format
+pub fn print_grouped_crds(grouped: &GroupedResources, format: &OutputFormat, show_versions: bool) -> Result<()> {
+    match format {
+        OutputFormat::Table => print_grouped_crds_table(grouped, show_versions),
+        OutputFormat::Json => print_json(&grouped)?,
+        OutputFormat::Yaml => print_yaml(&grouped)?,
+    }
+
+    Ok(())
+}
+
+/// Print grouped custom resources in the specified format
+pub fn print_grouped_custom_resources(grouped: &GroupedResources, format: &OutputFormat) -> Result<()> {
+    match format {
+        OutputFormat::Table => print_grouped_custom_resources_table(grouped),
         OutputFormat::Json => print_json(&grouped)?,
         OutputFormat::Yaml => print_yaml(&grouped)?,
     }
@@ -724,6 +778,128 @@ fn print_grouped_secrets_table(grouped: &GroupedResources) {
         }
 
         println!("Total secrets in group: {}", group.secrets.len());
+    }
+}
+
+fn print_crds_table(crds: &[CRDInfo], show_versions: bool) {
+    if crds.is_empty() {
+        println!("No CRDs found");
+        return;
+    }
+
+    #[derive(Tabled)]
+    struct CRDRow {
+        #[tabled(rename = "NAME")]
+        name: String,
+        #[tabled(rename = "GROUP")]
+        group: String,
+        #[tabled(rename = "VERSION")]
+        version: String,
+        #[tabled(rename = "KIND")]
+        kind: String,
+        #[tabled(rename = "SCOPE")]
+        scope: String,
+        #[tabled(rename = "INSTANCES")]
+        instances: String,
+        #[tabled(rename = "AGE")]
+        age: String,
+    }
+
+    let rows: Vec<CRDRow> = crds
+        .iter()
+        .map(|crd| CRDRow {
+            name: crd.name.clone(),
+            group: crd.group.clone(),
+            version: crd.version.clone(),
+            kind: crd.kind.clone(),
+            scope: crd.scope.clone(),
+            instances: crd.instance_count.to_string(),
+            age: crd.age.clone(),
+        })
+        .collect();
+
+    let table = Table::new(rows);
+    println!("{}", table);
+
+    if show_versions {
+        for crd in crds {
+            if crd.versions.len() > 1 {
+                println!("\nVersions for {}:", crd.name.cyan());
+                for version in &crd.versions {
+                    let status = if version.storage {
+                        "storage".green()
+                    } else if version.served {
+                        "served".yellow()
+                    } else {
+                        "deprecated".red()
+                    };
+                    println!("  {} ({})", version.name, status);
+                }
+            }
+        }
+    }
+}
+
+fn print_custom_resources_table(custom_resources: &[CustomResourceInfo]) {
+    if custom_resources.is_empty() {
+        println!("No custom resources found");
+        return;
+    }
+
+    #[derive(Tabled)]
+    struct CustomResourceRow {
+        #[tabled(rename = "NAME")]
+        name: String,
+        #[tabled(rename = "NAMESPACE")]
+        namespace: String,
+        #[tabled(rename = "KIND")]
+        kind: String,
+        #[tabled(rename = "VERSION")]
+        version: String,
+        #[tabled(rename = "AGE")]
+        age: String,
+    }
+
+    let rows: Vec<CustomResourceRow> = custom_resources
+        .iter()
+        .map(|cr| CustomResourceRow {
+            name: cr.name.clone(),
+            namespace: cr.namespace.clone().unwrap_or_else(|| "cluster".to_string()),
+            kind: cr.kind.clone(),
+            version: cr.version.clone(),
+            age: cr.age.clone(),
+        })
+        .collect();
+
+    let table = Table::new(rows);
+    println!("{}", table);
+}
+
+fn print_grouped_crds_table(grouped: &GroupedResources, show_versions: bool) {
+    for (group_name, group) in &grouped.groups {
+        println!("\n=== CRD Group: {} ({}) ===", group_name, group.group_type);
+
+        if !group.crds.is_empty() {
+            print_crds_table(&group.crds, show_versions);
+        } else {
+            println!("No CRDs in this group");
+        }
+
+        println!("Total CRDs in group: {}", group.crds.len());
+    }
+}
+
+fn print_grouped_custom_resources_table(grouped: &GroupedResources) {
+    for (group_name, group) in &grouped.groups {
+        println!("\n=== Custom Resource Group: {} ({}) ===", group_name, group.group_type);
+
+        if !group.custom_resources.is_empty() {
+            print_custom_resources_table(&group.custom_resources);
+        } else {
+            println!("No custom resources in this group");
+        }
+
+        println!("Total custom resources in group: {}", group.custom_resources.len());
     }
 }
 

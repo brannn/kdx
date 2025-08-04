@@ -1,6 +1,6 @@
 //! Advanced filtering and grouping capabilities for Kubernetes resources
 
-use crate::discovery::{ConfigMapInfo, DaemonSetInfo, DeploymentInfo, PodInfo, SecretInfo, ServiceInfo, StatefulSetInfo};
+use crate::discovery::{ConfigMapInfo, CRDInfo, CustomResourceInfo, DaemonSetInfo, DeploymentInfo, PodInfo, SecretInfo, ServiceInfo, StatefulSetInfo};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -57,6 +57,8 @@ pub struct ResourceGroup {
     pub daemonsets: Vec<DaemonSetInfo>,
     pub configmaps: Vec<ConfigMapInfo>,
     pub secrets: Vec<SecretInfo>,
+    pub crds: Vec<CRDInfo>,
+    pub custom_resources: Vec<CustomResourceInfo>,
     pub metadata: BTreeMap<String, String>,
 }
 
@@ -72,6 +74,8 @@ impl ResourceGroup {
             daemonsets: Vec::new(),
             configmaps: Vec::new(),
             secrets: Vec::new(),
+            crds: Vec::new(),
+            custom_resources: Vec::new(),
             metadata: BTreeMap::new(),
         }
     }
@@ -84,6 +88,8 @@ impl ResourceGroup {
             + self.daemonsets.len()
             + self.configmaps.len()
             + self.secrets.len()
+            + self.crds.len()
+            + self.custom_resources.len()
     }
 }
 
@@ -305,6 +311,24 @@ impl ResourceFilter {
             .collect()
     }
 
+    /// Filter CRDs based on criteria
+    pub fn filter_crds(crds: Vec<CRDInfo>, criteria: &FilterCriteria) -> Vec<CRDInfo> {
+        crds.into_iter()
+            .filter(|crd| Self::matches_crd_criteria(crd, criteria))
+            .collect()
+    }
+
+    /// Filter custom resources based on criteria
+    pub fn filter_custom_resources(
+        custom_resources: Vec<CustomResourceInfo>,
+        criteria: &FilterCriteria,
+    ) -> Vec<CustomResourceInfo> {
+        custom_resources
+            .into_iter()
+            .filter(|cr| Self::matches_custom_resource_criteria(cr, criteria))
+            .collect()
+    }
+
     fn matches_criteria(service: &ServiceInfo, criteria: &FilterCriteria) -> bool {
         // Label selector check
         if let Some(selector_str) = &criteria.label_selector {
@@ -393,6 +417,36 @@ impl ResourceFilter {
         if let Some(selector_str) = &criteria.label_selector {
             if let Ok(selector) = LabelSelector::parse(selector_str) {
                 if !selector.matches(&secret.labels) {
+                    return false;
+                }
+            }
+        }
+
+        // TODO: Add age filtering when we implement proper timestamp parsing
+
+        true
+    }
+
+    fn matches_crd_criteria(crd: &CRDInfo, criteria: &FilterCriteria) -> bool {
+        // Label selector check
+        if let Some(selector_str) = &criteria.label_selector {
+            if let Ok(selector) = LabelSelector::parse(selector_str) {
+                if !selector.matches(&crd.labels) {
+                    return false;
+                }
+            }
+        }
+
+        // TODO: Add age filtering when we implement proper timestamp parsing
+
+        true
+    }
+
+    fn matches_custom_resource_criteria(cr: &CustomResourceInfo, criteria: &FilterCriteria) -> bool {
+        // Label selector check
+        if let Some(selector_str) = &criteria.label_selector {
+            if let Ok(selector) = LabelSelector::parse(selector_str) {
+                if !selector.matches(&cr.labels) {
                     return false;
                 }
             }
@@ -502,6 +556,67 @@ impl ResourceGrouper {
             GroupBy::None => {
                 let mut group = ResourceGroup::new("All Secrets".to_string(), "none".to_string());
                 // Note: We'd need to extend ResourceGroup to include secrets field
+                groups.insert("all".to_string(), group);
+            }
+        }
+
+        GroupedResources { groups }
+    }
+
+    /// Group CRDs by the specified criteria
+    pub fn group_crds(crds: Vec<CRDInfo>, group_by: &GroupBy) -> GroupedResources {
+        let mut groups = BTreeMap::new();
+
+        match group_by {
+            GroupBy::App => {
+                Self::group_crds_by_label(&mut groups, crds, "app");
+            }
+            GroupBy::Tier => {
+                Self::group_crds_by_label(&mut groups, crds, "tier");
+            }
+            GroupBy::HelmRelease => {
+                Self::group_crds_by_label(&mut groups, crds, "app.kubernetes.io/instance");
+            }
+            GroupBy::Namespace => {
+                // CRDs are cluster-scoped, so group by scope instead
+                Self::group_crds_by_scope(&mut groups, crds);
+            }
+            GroupBy::CustomLabel(label_key) => {
+                Self::group_crds_by_label(&mut groups, crds, label_key);
+            }
+            GroupBy::None => {
+                let mut group = ResourceGroup::new("All CRDs".to_string(), "none".to_string());
+                // Note: We'd need to extend ResourceGroup to include crds field
+                groups.insert("all".to_string(), group);
+            }
+        }
+
+        GroupedResources { groups }
+    }
+
+    /// Group custom resources by the specified criteria
+    pub fn group_custom_resources(custom_resources: Vec<CustomResourceInfo>, group_by: &GroupBy) -> GroupedResources {
+        let mut groups = BTreeMap::new();
+
+        match group_by {
+            GroupBy::App => {
+                Self::group_custom_resources_by_label(&mut groups, custom_resources, "app");
+            }
+            GroupBy::Tier => {
+                Self::group_custom_resources_by_label(&mut groups, custom_resources, "tier");
+            }
+            GroupBy::HelmRelease => {
+                Self::group_custom_resources_by_label(&mut groups, custom_resources, "app.kubernetes.io/instance");
+            }
+            GroupBy::Namespace => {
+                Self::group_custom_resources_by_namespace(&mut groups, custom_resources);
+            }
+            GroupBy::CustomLabel(label_key) => {
+                Self::group_custom_resources_by_label(&mut groups, custom_resources, label_key);
+            }
+            GroupBy::None => {
+                let mut group = ResourceGroup::new("All Custom Resources".to_string(), "none".to_string());
+                // Note: We'd need to extend ResourceGroup to include custom_resources field
                 groups.insert("all".to_string(), group);
             }
         }
@@ -712,6 +827,69 @@ impl ResourceGrouper {
                 .entry(secret.namespace.clone())
                 .or_insert_with(|| ResourceGroup::new(secret.namespace.clone(), "namespace".to_string()));
             group.secrets.push(secret);
+        }
+    }
+
+    fn group_crds_by_label(
+        groups: &mut BTreeMap<String, ResourceGroup>,
+        crds: Vec<CRDInfo>,
+        label_key: &str,
+    ) {
+        for crd in crds {
+            let group_name = crd
+                .labels
+                .get(label_key)
+                .unwrap_or(&"unknown".to_string())
+                .clone();
+
+            let group = groups
+                .entry(group_name.clone())
+                .or_insert_with(|| ResourceGroup::new(group_name, label_key.to_string()));
+            group.crds.push(crd);
+        }
+    }
+
+    fn group_crds_by_scope(
+        groups: &mut BTreeMap<String, ResourceGroup>,
+        crds: Vec<CRDInfo>,
+    ) {
+        for crd in crds {
+            let group = groups
+                .entry(crd.scope.clone())
+                .or_insert_with(|| ResourceGroup::new(crd.scope.clone(), "scope".to_string()));
+            group.crds.push(crd);
+        }
+    }
+
+    fn group_custom_resources_by_label(
+        groups: &mut BTreeMap<String, ResourceGroup>,
+        custom_resources: Vec<CustomResourceInfo>,
+        label_key: &str,
+    ) {
+        for cr in custom_resources {
+            let group_name = cr
+                .labels
+                .get(label_key)
+                .unwrap_or(&"unknown".to_string())
+                .clone();
+
+            let group = groups
+                .entry(group_name.clone())
+                .or_insert_with(|| ResourceGroup::new(group_name, label_key.to_string()));
+            group.custom_resources.push(cr);
+        }
+    }
+
+    fn group_custom_resources_by_namespace(
+        groups: &mut BTreeMap<String, ResourceGroup>,
+        custom_resources: Vec<CustomResourceInfo>,
+    ) {
+        for cr in custom_resources {
+            let namespace = cr.namespace.clone().unwrap_or_else(|| "cluster".to_string());
+            let group = groups
+                .entry(namespace.clone())
+                .or_insert_with(|| ResourceGroup::new(namespace, "namespace".to_string()));
+            group.custom_resources.push(cr);
         }
     }
 }
@@ -1060,5 +1238,264 @@ mod tests {
         assert!(json_env.contains("Environment"));
         assert!(json_envfrom.contains("EnvironmentFrom"));
         assert!(json_imgpull.contains("ImagePullSecret"));
+    }
+
+    #[test]
+    fn test_filter_crds() {
+        use crate::discovery::{CRDInfo, CRDVersion};
+
+        let mut labels = BTreeMap::new();
+        labels.insert("app".to_string(), "monitoring".to_string());
+        labels.insert("tier".to_string(), "infrastructure".to_string());
+
+        let crd = CRDInfo {
+            name: "prometheuses.monitoring.coreos.com".to_string(),
+            group: "monitoring.coreos.com".to_string(),
+            version: "v1".to_string(),
+            kind: "Prometheus".to_string(),
+            plural: "prometheuses".to_string(),
+            scope: "Namespaced".to_string(),
+            age: "30d".to_string(),
+            labels,
+            instance_count: 5,
+            versions: vec![CRDVersion {
+                name: "v1".to_string(),
+                served: true,
+                storage: true,
+                schema_properties: vec!["spec".to_string(), "status".to_string()],
+            }],
+            description: Some("Prometheus monitoring instances".to_string()),
+        };
+
+        let crds = vec![crd];
+
+        // Test label selector filtering
+        let criteria = FilterCriteria {
+            label_selector: Some("app=monitoring".to_string()),
+            ..Default::default()
+        };
+        let filtered = ResourceFilter::filter_crds(crds.clone(), &criteria);
+        assert_eq!(filtered.len(), 1);
+
+        // Test label selector that doesn't match
+        let criteria = FilterCriteria {
+            label_selector: Some("app=database".to_string()),
+            ..Default::default()
+        };
+        let filtered = ResourceFilter::filter_crds(crds, &criteria);
+        assert_eq!(filtered.len(), 0);
+    }
+
+    #[test]
+    fn test_filter_custom_resources() {
+        use crate::discovery::{CustomResourceInfo, ResourceReference, ReferenceType};
+
+        let mut labels = BTreeMap::new();
+        labels.insert("app".to_string(), "prometheus".to_string());
+        labels.insert("instance".to_string(), "main".to_string());
+
+        let mut annotations = BTreeMap::new();
+        annotations.insert("kubectl.kubernetes.io/last-applied-configuration".to_string(), "{}".to_string());
+
+        let custom_resource = CustomResourceInfo {
+            name: "prometheus-main".to_string(),
+            namespace: Some("monitoring".to_string()),
+            crd_name: "prometheuses.monitoring.coreos.com".to_string(),
+            group: "monitoring.coreos.com".to_string(),
+            version: "v1".to_string(),
+            kind: "Prometheus".to_string(),
+            age: "15d".to_string(),
+            labels,
+            annotations,
+            spec_summary: "replicas: 2, retention: 30d".to_string(),
+            status_summary: Some("ready: true, replicas: 2".to_string()),
+            related_resources: vec![ResourceReference {
+                kind: "Service".to_string(),
+                name: "prometheus-main".to_string(),
+                namespace: "monitoring".to_string(),
+                reference_type: ReferenceType::VolumeMount,
+            }],
+        };
+
+        let custom_resources = vec![custom_resource];
+
+        // Test label selector filtering
+        let criteria = FilterCriteria {
+            label_selector: Some("app=prometheus".to_string()),
+            ..Default::default()
+        };
+        let filtered = ResourceFilter::filter_custom_resources(custom_resources.clone(), &criteria);
+        assert_eq!(filtered.len(), 1);
+
+        // Test label selector that doesn't match
+        let criteria = FilterCriteria {
+            label_selector: Some("app=grafana".to_string()),
+            ..Default::default()
+        };
+        let filtered = ResourceFilter::filter_custom_resources(custom_resources, &criteria);
+        assert_eq!(filtered.len(), 0);
+    }
+
+    #[test]
+    fn test_group_crds_by_scope() {
+        use crate::discovery::{CRDInfo, CRDVersion};
+
+        let crds = vec![
+            CRDInfo {
+                name: "nodes.metrics.k8s.io".to_string(),
+                group: "metrics.k8s.io".to_string(),
+                version: "v1beta1".to_string(),
+                kind: "NodeMetrics".to_string(),
+                plural: "nodes".to_string(),
+                scope: "Cluster".to_string(),
+                age: "100d".to_string(),
+                labels: BTreeMap::new(),
+                instance_count: 3,
+                versions: vec![],
+                description: None,
+            },
+            CRDInfo {
+                name: "prometheuses.monitoring.coreos.com".to_string(),
+                group: "monitoring.coreos.com".to_string(),
+                version: "v1".to_string(),
+                kind: "Prometheus".to_string(),
+                plural: "prometheuses".to_string(),
+                scope: "Namespaced".to_string(),
+                age: "30d".to_string(),
+                labels: BTreeMap::new(),
+                instance_count: 2,
+                versions: vec![],
+                description: None,
+            },
+        ];
+
+        let grouped = ResourceGrouper::group_crds(crds, &GroupBy::Namespace);
+
+        assert_eq!(grouped.groups.len(), 2);
+        assert!(grouped.groups.contains_key("Cluster"));
+        assert!(grouped.groups.contains_key("Namespaced"));
+
+        let cluster_group = &grouped.groups["Cluster"];
+        assert_eq!(cluster_group.crds.len(), 1);
+        assert_eq!(cluster_group.crds[0].kind, "NodeMetrics");
+
+        let namespaced_group = &grouped.groups["Namespaced"];
+        assert_eq!(namespaced_group.crds.len(), 1);
+        assert_eq!(namespaced_group.crds[0].kind, "Prometheus");
+    }
+
+    #[test]
+    fn test_group_custom_resources_by_namespace() {
+        use crate::discovery::CustomResourceInfo;
+
+        let custom_resources = vec![
+            CustomResourceInfo {
+                name: "prometheus-main".to_string(),
+                namespace: Some("monitoring".to_string()),
+                crd_name: "prometheuses.monitoring.coreos.com".to_string(),
+                group: "monitoring.coreos.com".to_string(),
+                version: "v1".to_string(),
+                kind: "Prometheus".to_string(),
+                age: "15d".to_string(),
+                labels: BTreeMap::new(),
+                annotations: BTreeMap::new(),
+                spec_summary: "replicas: 2".to_string(),
+                status_summary: None,
+                related_resources: vec![],
+            },
+            CustomResourceInfo {
+                name: "cluster-issuer".to_string(),
+                namespace: None, // Cluster-scoped
+                crd_name: "clusterissuers.cert-manager.io".to_string(),
+                group: "cert-manager.io".to_string(),
+                version: "v1".to_string(),
+                kind: "ClusterIssuer".to_string(),
+                age: "60d".to_string(),
+                labels: BTreeMap::new(),
+                annotations: BTreeMap::new(),
+                spec_summary: "acme: letsencrypt".to_string(),
+                status_summary: Some("ready: true".to_string()),
+                related_resources: vec![],
+            },
+        ];
+
+        let grouped = ResourceGrouper::group_custom_resources(custom_resources, &GroupBy::Namespace);
+
+        assert_eq!(grouped.groups.len(), 2);
+        assert!(grouped.groups.contains_key("monitoring"));
+        assert!(grouped.groups.contains_key("cluster"));
+
+        let monitoring_group = &grouped.groups["monitoring"];
+        assert_eq!(monitoring_group.custom_resources.len(), 1);
+        assert_eq!(monitoring_group.custom_resources[0].kind, "Prometheus");
+
+        let cluster_group = &grouped.groups["cluster"];
+        assert_eq!(cluster_group.custom_resources.len(), 1);
+        assert_eq!(cluster_group.custom_resources[0].kind, "ClusterIssuer");
+    }
+
+    #[test]
+    fn test_crd_version_serialization() {
+        use crate::discovery::CRDVersion;
+
+        let version = CRDVersion {
+            name: "v1".to_string(),
+            served: true,
+            storage: true,
+            schema_properties: vec!["spec".to_string(), "status".to_string(), "metadata".to_string()],
+        };
+
+        // Test JSON serialization
+        let json = serde_json::to_string(&version).expect("Failed to serialize CRDVersion");
+        assert!(json.contains("v1"));
+        assert!(json.contains("true"));
+        assert!(json.contains("spec"));
+
+        // Test deserialization
+        let deserialized: CRDVersion = serde_json::from_str(&json).expect("Failed to deserialize CRDVersion");
+        assert_eq!(deserialized.name, "v1");
+        assert!(deserialized.served);
+        assert!(deserialized.storage);
+        assert_eq!(deserialized.schema_properties.len(), 3);
+    }
+
+    #[test]
+    fn test_crd_info_with_multiple_versions() {
+        use crate::discovery::{CRDInfo, CRDVersion};
+
+        let versions = vec![
+            CRDVersion {
+                name: "v1beta1".to_string(),
+                served: true,
+                storage: false,
+                schema_properties: vec!["spec".to_string()],
+            },
+            CRDVersion {
+                name: "v1".to_string(),
+                served: true,
+                storage: true,
+                schema_properties: vec!["spec".to_string(), "status".to_string()],
+            },
+        ];
+
+        let crd = CRDInfo {
+            name: "certificates.cert-manager.io".to_string(),
+            group: "cert-manager.io".to_string(),
+            version: "v1".to_string(), // Storage version
+            kind: "Certificate".to_string(),
+            plural: "certificates".to_string(),
+            scope: "Namespaced".to_string(),
+            age: "90d".to_string(),
+            labels: BTreeMap::new(),
+            instance_count: 10,
+            versions,
+            description: Some("TLS certificates managed by cert-manager".to_string()),
+        };
+
+        assert_eq!(crd.versions.len(), 2);
+        assert_eq!(crd.version, "v1"); // Should be the storage version
+        assert!(crd.versions.iter().any(|v| v.storage && v.name == "v1"));
+        assert!(crd.versions.iter().any(|v| !v.storage && v.name == "v1beta1"));
+        assert_eq!(crd.instance_count, 10);
     }
 }

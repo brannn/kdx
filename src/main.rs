@@ -255,6 +255,66 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
                 output::print_secrets(&secrets, &cli.output)?;
             }
         }
+        Commands::Crds {
+            selector,
+            group_by,
+            with_instances,
+            show_versions,
+        } => {
+            let mut crds = discovery.list_crds().await?;
+
+            // Apply filtering
+            let criteria = FilterCriteria {
+                label_selector: selector,
+                ..Default::default()
+            };
+            crds = ResourceFilter::filter_crds(crds, &criteria);
+
+            // Filter for CRDs with instances if requested
+            if with_instances {
+                crds = crds.into_iter().filter(|crd| crd.instance_count > 0).collect();
+            }
+
+            // Apply grouping if specified
+            if let Some(group_by_str) = group_by {
+                let group_by = parse_group_by(&group_by_str);
+                let grouped = ResourceGrouper::group_crds(crds, &group_by);
+                output::print_grouped_crds(&grouped, &cli.output, show_versions)?;
+            } else {
+                output::print_crds(&crds, &cli.output, show_versions)?;
+            }
+        }
+        Commands::CustomResources {
+            crd_name,
+            namespace,
+            all_namespaces,
+            selector,
+            group_by,
+        } => {
+            let ns = if all_namespaces {
+                None
+            } else {
+                namespace.as_deref().or(cli.namespace.as_deref())
+            };
+
+            let mut custom_resources = discovery.list_custom_resources(&crd_name, ns).await?;
+
+            // Apply filtering
+            let criteria = FilterCriteria {
+                label_selector: selector,
+                ..Default::default()
+            };
+            custom_resources = ResourceFilter::filter_custom_resources(custom_resources, &criteria);
+
+            // Apply grouping if specified
+            if let Some(group_by_str) = group_by {
+                let group_by = parse_group_by(&group_by_str);
+                let grouped = ResourceGrouper::group_custom_resources(custom_resources, &group_by);
+                output::print_grouped_custom_resources(&grouped, &cli.output)?;
+            } else {
+                output::print_custom_resources(&custom_resources, &cli.output)?;
+            }
+        }
         Commands::Describe { service, namespace } => {
             let ns = namespace
                 .as_deref()

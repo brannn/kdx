@@ -4,6 +4,7 @@ use crate::error::{ExplorerError, Result};
 use k8s_openapi::api::apps::v1::{DaemonSet, Deployment, StatefulSet};
 use k8s_openapi::api::core::v1::{ConfigMap, Pod, Secret, Service};
 use k8s_openapi::api::networking::v1::Ingress;
+use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
 use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
 use kube::{Api, Client};
 use serde::{Deserialize, Serialize};
@@ -312,6 +313,58 @@ impl DiscoveryEngine {
         self.find_secret_associations(&mut secret_infos).await?;
 
         Ok(secret_infos)
+    }
+
+    /// List Custom Resource Definitions in the cluster
+    pub async fn list_crds(&self) -> Result<Vec<CRDInfo>> {
+        let crds: Api<CustomResourceDefinition> = Api::all(self.client.clone());
+
+        let crd_list = crds.list(&Default::default()).await?;
+
+        let mut crd_infos = Vec::new();
+        for crd in crd_list.items {
+            if let Some(crd_info) = self.convert_crd_to_info(crd).await {
+                crd_infos.push(crd_info);
+            }
+        }
+
+        // Find instance counts for each CRD
+        self.find_crd_instance_counts(&mut crd_infos).await?;
+
+        Ok(crd_infos)
+    }
+
+    /// List Custom Resource instances for a specific CRD
+    pub async fn list_custom_resources(
+        &self,
+        crd_name: &str,
+        namespace: Option<&str>,
+    ) -> Result<Vec<CustomResourceInfo>> {
+        // First, get the CRD to understand its structure
+        let crds: Api<CustomResourceDefinition> = Api::all(self.client.clone());
+        let crd = match crds.get(crd_name).await {
+            Ok(crd) => crd,
+            Err(_) => return Ok(Vec::new()), // CRD doesn't exist
+        };
+
+        // Extract CRD metadata for custom resource discovery
+        let spec = crd.spec;
+        let group = spec.group;
+        let names = spec.names;
+        let plural = names.plural;
+
+        // Get the preferred version (storage version)
+        let version = spec.versions
+            .iter()
+            .find(|v| v.storage)
+            .or_else(|| spec.versions.first())
+            .map(|v| v.name.clone())
+            .unwrap_or_else(|| "v1".to_string());
+
+        // Use dynamic client to list custom resources
+        let custom_resources = self.list_dynamic_resources(&group, &version, &plural, namespace).await?;
+
+        Ok(custom_resources)
     }
 
     /// Check the health of a service by testing its cluster IP endpoints
@@ -678,6 +731,87 @@ impl DiscoveryEngine {
             }
         }
     }
+
+    async fn convert_crd_to_info(&self, crd: CustomResourceDefinition) -> Option<CRDInfo> {
+        let metadata = crd.metadata;
+        let spec = crd.spec;
+
+        let name = metadata.name?;
+        let labels = metadata.labels.unwrap_or_default();
+
+        let group = spec.group;
+        let names = spec.names;
+        let kind = names.kind;
+        let plural = names.plural;
+        let scope = spec.scope;
+
+        // Get the preferred version (storage version)
+        let version = spec.versions
+            .iter()
+            .find(|v| v.storage)
+            .or_else(|| spec.versions.first())
+            .map(|v| v.name.clone())
+            .unwrap_or_else(|| "v1".to_string());
+
+        // Convert versions
+        let versions: Vec<CRDVersion> = spec.versions
+            .into_iter()
+            .map(|v| {
+                let schema_properties = v.schema
+                    .and_then(|s| s.open_api_v3_schema)
+                    .and_then(|schema| schema.properties)
+                    .map(|props| props.keys().cloned().collect())
+                    .unwrap_or_default();
+
+                CRDVersion {
+                    name: v.name,
+                    served: v.served,
+                    storage: v.storage,
+                    schema_properties,
+                }
+            })
+            .collect();
+
+        Some(CRDInfo {
+            name,
+            group,
+            version,
+            kind,
+            plural,
+            scope,
+            age: "Unknown".to_string(), // TODO: Calculate from creation timestamp
+            labels,
+            instance_count: 0, // Will be populated by instance counting
+            versions,
+            description: None, // TODO: Extract from CRD description
+        })
+    }
+
+    async fn find_crd_instance_counts(&self, crds: &mut [CRDInfo]) -> Result<()> {
+        for crd in crds.iter_mut() {
+            // Count instances for this CRD
+            let instances = self.list_custom_resources(&crd.name, None).await?;
+            crd.instance_count = instances.len() as u32;
+        }
+        Ok(())
+    }
+
+    async fn list_dynamic_resources(
+        &self,
+        group: &str,
+        version: &str,
+        plural: &str,
+        namespace: Option<&str>,
+    ) -> Result<Vec<CustomResourceInfo>> {
+        // This is a simplified implementation
+        // In a real implementation, we would use kube::discovery and dynamic client
+        // For now, we'll return an empty list as a placeholder
+
+        // TODO: Implement dynamic resource discovery using kube::discovery::Discovery
+        // and kube::api::DynamicObject
+
+        Ok(Vec::new())
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -803,6 +937,45 @@ pub struct DaemonSetInfo {
     pub age: String,
     pub labels: BTreeMap<String, String>,
     pub selector: BTreeMap<String, String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CRDInfo {
+    pub name: String,
+    pub group: String,
+    pub version: String,
+    pub kind: String,
+    pub plural: String,
+    pub scope: String, // Namespaced or Cluster
+    pub age: String,
+    pub labels: BTreeMap<String, String>,
+    pub instance_count: u32,
+    pub versions: Vec<CRDVersion>,
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CRDVersion {
+    pub name: String,
+    pub served: bool,
+    pub storage: bool,
+    pub schema_properties: Vec<String>, // Simplified schema representation
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CustomResourceInfo {
+    pub name: String,
+    pub namespace: Option<String>, // None for cluster-scoped resources
+    pub crd_name: String,
+    pub group: String,
+    pub version: String,
+    pub kind: String,
+    pub age: String,
+    pub labels: BTreeMap<String, String>,
+    pub annotations: BTreeMap<String, String>,
+    pub spec_summary: String, // Simplified representation of spec
+    pub status_summary: Option<String>, // Simplified representation of status
+    pub related_resources: Vec<ResourceReference>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

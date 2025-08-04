@@ -168,6 +168,48 @@ pub enum Commands {
         secret_type: Option<String>,
     },
 
+    /// List Custom Resource Definitions (CRDs) in the cluster
+    Crds {
+        /// Filter by label selector (e.g., app=web,tier!=cache)
+        #[clap(long, short = 's')]
+        selector: Option<String>,
+
+        /// Group resources by criteria (app, tier, helm-release, namespace)
+        #[clap(long, short = 'g')]
+        group_by: Option<String>,
+
+        /// Show only CRDs with instances
+        #[clap(long)]
+        with_instances: bool,
+
+        /// Show detailed version information
+        #[clap(long)]
+        show_versions: bool,
+    },
+
+    /// List Custom Resource instances for a specific CRD
+    CustomResources {
+        /// Name of the CRD to list instances for
+        #[clap(value_name = "CRD_NAME")]
+        crd_name: String,
+
+        /// Show custom resources from a specific namespace
+        #[clap(long, short = 'n')]
+        namespace: Option<String>,
+
+        /// Show all namespaces
+        #[clap(long, short = 'A')]
+        all_namespaces: bool,
+
+        /// Filter by label selector (e.g., app=web,tier!=cache)
+        #[clap(long, short = 's')]
+        selector: Option<String>,
+
+        /// Group resources by criteria (app, tier, helm-release, namespace)
+        #[clap(long, short = 'g')]
+        group_by: Option<String>,
+    },
+
     /// Describe a service and its relationships
     Describe {
         /// Service name to describe
