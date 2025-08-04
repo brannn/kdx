@@ -37,17 +37,19 @@ Generated visual dependency graph:
 ```
 
 ```console
-$ kdx relationships --namespace production api-gateway
+$ kdx describe api-gateway --namespace production
 
-Service Relationships: api-gateway
-├── Depends on:
-│   ├── auth-service (ClusterIP)
-│   └── user-service (ClusterIP)
-├── Used by:
-│   └── ingress-nginx (LoadBalancer)
-└── Exposes:
-    ├── Port 80 -> 8080
-    └── Port 443 -> 8443
+Service Description: api-gateway
+├── Namespace: production
+├── Type: LoadBalancer
+├── Cluster IP: 10.43.132.227
+├── External IP: 203.0.113.10
+├── Ports:
+│   ├── http: 80 -> 8080 (TCP)
+│   └── https: 443 -> 8443 (TCP)
+└── Backend Pods:
+    ├── api-gateway-abc123 (Running)
+    └── api-gateway-def456 (Running)
 ```
 
 ```console
