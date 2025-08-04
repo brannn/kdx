@@ -53,23 +53,15 @@ Service Description: api-gateway
 ```
 
 ```console
-$ kdx ingress --namespace production
+$ kdx services --namespace production --selector 'service.kubernetes.io/load-balancer-cleanup'
 
-Ingress Discovery:
-├── main-ingress
-│   ├── Host: api.company.com
-│   ├── Path: /
-│   └── Backend: api-gateway:80
-├── auth-ingress
-│   ├── Host: auth.company.com
-│   ├── Path: /
-│   └── Backend: auth-service:8080
-└── LoadBalancer Services:
-    └── api-gateway (External IP: 203.0.113.10)
+NAME           TYPE           CLUSTER-IP     EXTERNAL-IP      PORT(S)        AGE
+api-gateway    LoadBalancer   10.43.132.227  203.0.113.10     80:30080/TCP   5d
+auth-service   LoadBalancer   10.43.132.228  203.0.113.11     80:30081/TCP   5d
 ```
 
 ```console
-$ kdx services --namespace production --format json
+$ kdx services --namespace production --output json
 
 [
   {
@@ -89,7 +81,7 @@ $ kdx services --namespace production --format json
 ```
 
 ```console
-$ kdx services --namespace production --format yaml
+$ kdx services --namespace production --output yaml
 
 - name: api-gateway
   namespace: production
