@@ -3,7 +3,7 @@
 use clap::{Parser, Subcommand, ValueEnum};
 
 #[derive(Parser)]
-#[clap(name = "kdx", version = "0.1.0")]
+#[clap(name = "kdx", version = env!("CARGO_PKG_VERSION"))]
 #[clap(about = "Kubernetes cluster exploration and discovery tool")]
 #[clap(
     long_about = "A command-line tool for exploring and discovering resources in Kubernetes clusters. Provides easy-to-use commands for listing services, pods, and understanding cluster topology and relationships."
