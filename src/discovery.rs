@@ -14,6 +14,48 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::task::JoinSet;
+
+/// Trait for lazy resource conversion to reduce memory usage
+pub trait LazyConvert<T> {
+    fn lazy_convert(&self) -> Option<T>;
+}
+
+/// Iterator that converts Kubernetes resources lazily
+pub struct LazyResourceIterator<I, T, U> {
+    inner: I,
+    _phantom: std::marker::PhantomData<(T, U)>,
+}
+
+impl<I, T, U> LazyResourceIterator<I, T, U> {
+    pub fn new(inner: I) -> Self {
+        Self {
+            inner,
+            _phantom: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<I, T, U> Iterator for LazyResourceIterator<I, T, U>
+where
+    I: Iterator<Item = T>,
+    T: LazyConvert<U>,
+{
+    type Item = U;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            match self.inner.next() {
+                Some(item) => {
+                    if let Some(converted) = item.lazy_convert() {
+                        return Some(converted);
+                    }
+                    // Continue to next item if conversion failed
+                }
+                None => return None,
+            }
+        }
+    }
+}
 /// Main discovery engine for Kubernetes resources
 #[derive(Clone)]
 pub struct DiscoveryEngine {
@@ -215,6 +257,98 @@ impl DiscoveryEngine {
         }
 
         Ok(all_pods)
+    }
+
+    /// Memory-efficient service discovery using lazy conversion
+    pub async fn list_services_lazy(
+        &self,
+        namespace: Option<&str>,
+        limit: Option<usize>,
+        page_size: usize,
+    ) -> Result<impl Iterator<Item = ServiceInfo>> {
+        let services: Api<Service> = match namespace {
+            Some(ns) => Api::namespaced(self.client.clone(), ns),
+            None => Api::all(self.client.clone()),
+        };
+
+        let mut all_services = Vec::new();
+        let mut continue_token: Option<String> = None;
+        let mut fetched = 0;
+
+        loop {
+            let mut list_params = kube::api::ListParams::default()
+                .limit(page_size as u32);
+
+            if let Some(token) = continue_token {
+                list_params = list_params.continue_token(&token);
+            }
+
+            let service_list = services.list(&list_params).await?;
+
+            for service in service_list.items {
+                if let Some(limit) = limit {
+                    if fetched >= limit {
+                        break;
+                    }
+                }
+
+                all_services.push(service);
+                fetched += 1;
+            }
+
+            continue_token = service_list.metadata.continue_;
+            if continue_token.is_none() || (limit.is_some() && fetched >= limit.unwrap()) {
+                break;
+            }
+        }
+
+        Ok(LazyResourceIterator::new(all_services.into_iter()))
+    }
+
+    /// Memory-efficient pod discovery using lazy conversion
+    pub async fn list_pods_lazy(
+        &self,
+        namespace: Option<&str>,
+        limit: Option<usize>,
+        page_size: usize,
+    ) -> Result<impl Iterator<Item = PodInfo>> {
+        let pods: Api<Pod> = match namespace {
+            Some(ns) => Api::namespaced(self.client.clone(), ns),
+            None => Api::all(self.client.clone()),
+        };
+
+        let mut all_pods = Vec::new();
+        let mut continue_token: Option<String> = None;
+        let mut fetched = 0;
+
+        loop {
+            let mut list_params = kube::api::ListParams::default()
+                .limit(page_size as u32);
+
+            if let Some(token) = continue_token {
+                list_params = list_params.continue_token(&token);
+            }
+
+            let pod_list = pods.list(&list_params).await?;
+
+            for pod in pod_list.items {
+                if let Some(limit) = limit {
+                    if fetched >= limit {
+                        break;
+                    }
+                }
+
+                all_pods.push(pod);
+                fetched += 1;
+            }
+
+            continue_token = pod_list.metadata.continue_;
+            if continue_token.is_none() || (limit.is_some() && fetched >= limit.unwrap()) {
+                break;
+            }
+        }
+
+        Ok(LazyResourceIterator::new(all_pods.into_iter()))
     }
 
     /// List services concurrently across multiple namespaces
@@ -1441,6 +1575,85 @@ pub struct ServiceTopology {
     pub backend_pods: Vec<PodInfo>,
     pub ingress_routes: Vec<String>, // TODO: Define proper ingress types
     pub dependencies: Vec<String>,   // TODO: Define proper dependency types
+}
+
+/// Lazy conversion implementations for memory efficiency
+impl LazyConvert<ServiceInfo> for Service {
+    fn lazy_convert(&self) -> Option<ServiceInfo> {
+        let name = self.metadata.name.as_ref()?.clone();
+        let namespace = self.metadata.namespace.as_ref()?.clone();
+
+        let spec = self.spec.as_ref()?;
+        let service_type = spec.type_.as_ref().unwrap_or(&"ClusterIP".to_string()).clone();
+        let cluster_ip = spec.cluster_ip.clone();
+
+        let ports = spec.ports.as_ref().map(|ports| {
+            ports.iter().map(|port| ServicePort {
+                name: port.name.clone(),
+                port: port.port,
+                target_port: port.target_port.as_ref().map(|tp| match tp {
+                    k8s_openapi::apimachinery::pkg::util::intstr::IntOrString::Int(i) => i.to_string(),
+                    k8s_openapi::apimachinery::pkg::util::intstr::IntOrString::String(s) => s.clone(),
+                }).unwrap_or_else(|| port.port.to_string()),
+                protocol: port.protocol.as_ref().unwrap_or(&"TCP".to_string()).clone(),
+            }).collect()
+        }).unwrap_or_default();
+
+        let selector = spec.selector.clone().unwrap_or_default();
+
+        Some(ServiceInfo {
+            name,
+            namespace,
+            service_type,
+            cluster_ip,
+            ports,
+            selector: Some(selector),
+        })
+    }
+}
+
+impl LazyConvert<PodInfo> for Pod {
+    fn lazy_convert(&self) -> Option<PodInfo> {
+        let name = self.metadata.name.as_ref()?.clone();
+        let namespace = self.metadata.namespace.as_ref()?.clone();
+
+        let spec = self.spec.as_ref()?;
+        let status = self.status.as_ref();
+
+        let phase = status
+            .and_then(|s| s.phase.as_ref())
+            .unwrap_or(&"Unknown".to_string())
+            .clone();
+
+        let pod_ip = status.and_then(|s| s.pod_ip.clone());
+        let node_name = spec.node_name.clone();
+
+        let labels = self.metadata.labels.clone().unwrap_or_default();
+
+        let containers = spec.containers.len() as i32;
+        let ready_containers = status
+            .and_then(|s| s.container_statuses.as_ref())
+            .map(|statuses| statuses.iter().filter(|cs| cs.ready).count() as i32)
+            .unwrap_or(0);
+
+        let restart_count = status
+            .and_then(|s| s.container_statuses.as_ref())
+            .map(|statuses| statuses.iter().map(|cs| cs.restart_count).sum())
+            .unwrap_or(0);
+
+        Some(PodInfo {
+            name,
+            namespace,
+            phase,
+            pod_ip,
+            node_name,
+            labels,
+            ready_containers: ready_containers as u32,
+            total_containers: containers as u32,
+            restart_count: restart_count as u32,
+            age: "Unknown".to_string(), // Would need creation timestamp calculation
+        })
+    }
 }
 
 #[cfg(test)]

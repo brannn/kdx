@@ -9,6 +9,7 @@ use crate::discovery::{
 use crate::error::{ExplorerError, Result};
 use crate::filtering::GroupedResources;
 use colored::*;
+use std::io::{self, Write};
 use tabled::{Table, Tabled};
 
 /// Print services in the specified format
@@ -927,6 +928,97 @@ fn print_grouped_custom_resources_table(grouped: &GroupedResources) {
             group.custom_resources.len()
         );
     }
+}
+
+/// Streaming output for large datasets to reduce memory usage
+pub struct StreamingOutput<W: Write> {
+    writer: W,
+    format: OutputFormat,
+    first_item: bool,
+}
+
+impl<W: Write> StreamingOutput<W> {
+    pub fn new(writer: W, format: OutputFormat) -> Self {
+        Self {
+            writer,
+            format,
+            first_item: true,
+        }
+    }
+
+    pub fn start_array(&mut self) -> Result<()> {
+        match self.format {
+            OutputFormat::Json => {
+                writeln!(self.writer, "[")?;
+            }
+            OutputFormat::Yaml => {
+                // YAML arrays start with items
+            }
+            OutputFormat::Table => {
+                // Table format doesn't support streaming
+            }
+        }
+        Ok(())
+    }
+
+    pub fn write_item<T: serde::Serialize>(&mut self, item: &T) -> Result<()> {
+        match self.format {
+            OutputFormat::Json => {
+                if !self.first_item {
+                    writeln!(self.writer, ",")?;
+                }
+                let json = serde_json::to_string_pretty(item)?;
+                write!(self.writer, "{}", json)?;
+                self.first_item = false;
+            }
+            OutputFormat::Yaml => {
+                let yaml = serde_yaml::to_string(item)?;
+                writeln!(self.writer, "---")?;
+                write!(self.writer, "{}", yaml)?;
+            }
+            OutputFormat::Table => {
+                // Table format requires all data at once
+                return Err(ExplorerError::OutputFormat(
+                    "Table format doesn't support streaming".to_string(),
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    pub fn end_array(&mut self) -> Result<()> {
+        match self.format {
+            OutputFormat::Json => {
+                writeln!(self.writer)?;
+                writeln!(self.writer, "]")?;
+            }
+            OutputFormat::Yaml => {
+                // YAML doesn't need explicit array end
+            }
+            OutputFormat::Table => {
+                // Table format doesn't support streaming
+            }
+        }
+        self.writer.flush()?;
+        Ok(())
+    }
+}
+
+/// Stream services output for large datasets
+pub fn stream_services<W: Write>(
+    services: impl Iterator<Item = ServiceInfo>,
+    writer: W,
+    format: &OutputFormat,
+) -> Result<()> {
+    let mut streaming = StreamingOutput::new(writer, format.clone());
+    streaming.start_array()?;
+
+    for service in services {
+        streaming.write_item(&service)?;
+    }
+
+    streaming.end_array()?;
+    Ok(())
 }
 
 #[cfg(test)]

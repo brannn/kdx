@@ -23,6 +23,18 @@ pub enum ExplorerError {
 
 pub type Result<T> = std::result::Result<T, ExplorerError>;
 
+impl From<serde_json::Error> for ExplorerError {
+    fn from(err: serde_json::Error) -> Self {
+        ExplorerError::OutputFormat(err.to_string())
+    }
+}
+
+impl From<serde_yaml::Error> for ExplorerError {
+    fn from(err: serde_yaml::Error) -> Self {
+        ExplorerError::OutputFormat(err.to_string())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -43,6 +43,14 @@ pub struct Cli {
     /// Maximum concurrent operations (default: 10)
     #[clap(long, global = true, default_value = "10")]
     pub concurrency: usize,
+
+    /// Use streaming output for large datasets (JSON/YAML only)
+    #[clap(long, global = true)]
+    pub stream: bool,
+
+    /// Enable memory optimization for large clusters
+    #[clap(long, global = true)]
+    pub memory_optimized: bool,
 }
 
 #[derive(Subcommand)]
@@ -269,6 +277,22 @@ pub enum Commands {
     Cache {
         #[clap(subcommand)]
         action: CacheAction,
+    },
+
+    /// Performance benchmarking and testing
+    Benchmark {
+        /// Number of iterations to run
+        #[clap(long, default_value = "5")]
+        iterations: usize,
+        /// Resource types to benchmark
+        #[clap(long)]
+        resources: Vec<String>,
+        /// Test memory optimization features
+        #[clap(long)]
+        test_memory: bool,
+        /// Test concurrent discovery
+        #[clap(long)]
+        test_concurrent: bool,
     },
 }
 
