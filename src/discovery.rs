@@ -1,6 +1,8 @@
 //! Kubernetes resource discovery and analysis
 
+use crate::cache::ResourceCache;
 use crate::error::{ExplorerError, Result};
+use crate::progress::ProgressTracker;
 use k8s_openapi::api::apps::v1::{DaemonSet, Deployment, StatefulSet};
 use k8s_openapi::api::core::v1::{ConfigMap, Pod, Secret, Service};
 use k8s_openapi::api::networking::v1::Ingress;
@@ -9,33 +11,112 @@ use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
 use kube::{Api, Client};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use std::sync::Arc;
+use std::time::Duration;
 /// Main discovery engine for Kubernetes resources
 pub struct DiscoveryEngine {
     client: Client,
+    cache: Arc<ResourceCache>,
 }
 
 impl DiscoveryEngine {
     pub fn new(client: Client) -> Self {
-        Self { client }
+        Self {
+            client,
+            cache: Arc::new(ResourceCache::new(Duration::from_secs(300))), // 5 minute default TTL
+        }
+    }
+
+    pub fn with_cache_ttl(client: Client, cache_ttl: Duration) -> Self {
+        Self {
+            client,
+            cache: Arc::new(ResourceCache::new(cache_ttl)),
+        }
+    }
+
+    /// Get cache statistics
+    pub fn cache_stats(&self) -> crate::cache::CacheStats {
+        self.cache.stats()
+    }
+
+    /// Clear cache
+    pub fn clear_cache(&self) {
+        self.cache.clear();
     }
 
     /// List services in the specified namespace (or all namespaces if None)
     pub async fn list_services(&self, namespace: Option<&str>) -> Result<Vec<ServiceInfo>> {
+        self.list_services_with_options(namespace, None, None, 100, false).await
+    }
+
+    /// List services with pagination and caching support
+    pub async fn list_services_with_options(
+        &self,
+        namespace: Option<&str>,
+        selector: Option<&str>,
+        limit: Option<usize>,
+        page_size: usize,
+        use_cache: bool,
+    ) -> Result<Vec<ServiceInfo>> {
+        // Check cache first if enabled
+        if use_cache {
+            if let Some(cached) = self.cache.get_services(namespace, selector) {
+                return Ok(if let Some(limit) = limit {
+                    cached.into_iter().take(limit).collect()
+                } else {
+                    cached
+                });
+            }
+        }
+
         let services: Api<Service> = match namespace {
             Some(ns) => Api::namespaced(self.client.clone(), ns),
             None => Api::all(self.client.clone()),
         };
 
-        let service_list = services.list(&Default::default()).await?;
+        let mut all_services = Vec::new();
+        let mut continue_token: Option<String> = None;
+        let mut fetched = 0;
 
-        let mut service_infos = Vec::new();
-        for service in service_list.items {
-            if let Some(service_info) = self.convert_service_to_info(service).await {
-                service_infos.push(service_info);
+        loop {
+            let mut list_params = kube::api::ListParams::default()
+                .limit(page_size as u32);
+
+            if let Some(sel) = selector {
+                list_params = list_params.labels(sel);
+            }
+
+            if let Some(token) = continue_token {
+                list_params = list_params.continue_token(&token);
+            }
+
+            let service_list = services.list(&list_params).await?;
+
+            for service in service_list.items {
+                if let Some(limit) = limit {
+                    if fetched >= limit {
+                        break;
+                    }
+                }
+
+                if let Some(service_info) = self.convert_service_to_info(service).await {
+                    all_services.push(service_info);
+                    fetched += 1;
+                }
+            }
+
+            continue_token = service_list.metadata.continue_;
+            if continue_token.is_none() || (limit.is_some() && fetched >= limit.unwrap()) {
+                break;
             }
         }
 
-        Ok(service_infos)
+        // Cache the results if caching is enabled
+        if use_cache {
+            self.cache.set_services(namespace, selector, all_services.clone());
+        }
+
+        Ok(all_services)
     }
 
     /// List pods in the specified namespace with optional label selector
@@ -44,26 +125,77 @@ impl DiscoveryEngine {
         namespace: Option<&str>,
         selector: Option<&str>,
     ) -> Result<Vec<PodInfo>> {
+        self.list_pods_with_options(namespace, selector, None, 100, false).await
+    }
+
+    /// List pods with pagination and caching support
+    pub async fn list_pods_with_options(
+        &self,
+        namespace: Option<&str>,
+        selector: Option<&str>,
+        limit: Option<usize>,
+        page_size: usize,
+        use_cache: bool,
+    ) -> Result<Vec<PodInfo>> {
+        // Check cache first if enabled
+        if use_cache {
+            if let Some(cached) = self.cache.get_pods(namespace, selector) {
+                return Ok(if let Some(limit) = limit {
+                    cached.into_iter().take(limit).collect()
+                } else {
+                    cached
+                });
+            }
+        }
+
         let pods: Api<Pod> = match namespace {
             Some(ns) => Api::namespaced(self.client.clone(), ns),
             None => Api::all(self.client.clone()),
         };
 
-        let mut list_params = kube::api::ListParams::default();
-        if let Some(sel) = selector {
-            list_params = list_params.labels(sel);
-        }
+        let mut all_pods = Vec::new();
+        let mut continue_token: Option<String> = None;
+        let mut fetched = 0;
 
-        let pod_list = pods.list(&list_params).await?;
+        loop {
+            let mut list_params = kube::api::ListParams::default()
+                .limit(page_size as u32);
 
-        let mut pod_infos = Vec::new();
-        for pod in pod_list.items {
-            if let Some(pod_info) = self.convert_pod_to_info(pod).await {
-                pod_infos.push(pod_info);
+            if let Some(sel) = selector {
+                list_params = list_params.labels(sel);
+            }
+
+            if let Some(token) = continue_token {
+                list_params = list_params.continue_token(&token);
+            }
+
+            let pod_list = pods.list(&list_params).await?;
+
+            for pod in pod_list.items {
+                if let Some(limit) = limit {
+                    if fetched >= limit {
+                        break;
+                    }
+                }
+
+                if let Some(pod_info) = self.convert_pod_to_info(pod).await {
+                    all_pods.push(pod_info);
+                    fetched += 1;
+                }
+            }
+
+            continue_token = pod_list.metadata.continue_;
+            if continue_token.is_none() || (limit.is_some() && fetched >= limit.unwrap()) {
+                break;
             }
         }
 
-        Ok(pod_infos)
+        // Cache the results if caching is enabled
+        if use_cache {
+            self.cache.set_pods(namespace, selector, all_pods.clone());
+        }
+
+        Ok(all_pods)
     }
 
     /// Get detailed information about a specific service

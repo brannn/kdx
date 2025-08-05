@@ -4,12 +4,14 @@
 //! Provides easy-to-use commands for listing services, pods, and understanding
 //! cluster topology and relationships.
 
+mod cache;
 mod cli;
 mod discovery;
 mod error;
 mod filtering;
 mod graph;
 mod output;
+mod progress;
 
 use clap::Parser;
 use cli::{Cli, Commands};
@@ -63,7 +65,24 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
                 namespace.as_deref().or(cli.namespace.as_deref())
             };
 
-            let mut services = discovery.list_services(ns).await?;
+            // Create progress tracker for long operations
+            let progress = if cli.show_progress {
+                Some(crate::progress::ProgressTracker::new_spinner(true, "Discovering services..."))
+            } else {
+                None
+            };
+
+            let mut services = discovery.list_services_with_options(
+                ns,
+                selector.as_deref(),
+                cli.limit,
+                cli.page_size,
+                true, // Use cache
+            ).await?;
+
+            if let Some(progress) = progress {
+                progress.finish_and_clear();
+            }
 
             // Apply filtering
             let criteria = FilterCriteria {
@@ -101,7 +120,24 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
                 namespace.as_deref().or(cli.namespace.as_deref())
             };
 
-            let mut pods = discovery.list_pods(ns, selector.as_deref()).await?;
+            // Create progress tracker for long operations
+            let progress = if cli.show_progress {
+                Some(crate::progress::ProgressTracker::new_spinner(true, "Discovering pods..."))
+            } else {
+                None
+            };
+
+            let mut pods = discovery.list_pods_with_options(
+                ns,
+                selector.as_deref(),
+                cli.limit,
+                cli.page_size,
+                true, // Use cache
+            ).await?;
+
+            if let Some(progress) = progress {
+                progress.finish_and_clear();
+            }
 
             // Apply additional filtering
             let criteria = FilterCriteria {

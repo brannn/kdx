@@ -27,6 +27,18 @@ pub struct Cli {
     /// Enable verbose logging
     #[clap(long, short = 'v', global = true)]
     pub verbose: bool,
+
+    /// Maximum number of resources to return
+    #[clap(long, global = true)]
+    pub limit: Option<usize>,
+
+    /// Page size for API requests (default: 100)
+    #[clap(long, global = true, default_value = "100")]
+    pub page_size: usize,
+
+    /// Show progress for long operations
+    #[clap(long, global = true)]
+    pub show_progress: bool,
 }
 
 #[derive(Subcommand)]
