@@ -68,15 +68,17 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
                 };
 
                 let namespaces = discovery.get_all_namespaces().await?;
-                let result = discovery.list_services_concurrent(
-                    namespaces,
-                    selector.as_deref(),
-                    cli.limit,
-                    cli.page_size,
-                    true, // Use cache
-                    cli.concurrency,
-                    progress.as_ref(),
-                ).await?;
+                let result = discovery
+                    .list_services_concurrent(
+                        namespaces,
+                        selector.as_deref(),
+                        cli.limit,
+                        cli.page_size,
+                        true, // Use cache
+                        cli.concurrency,
+                        progress.as_ref(),
+                    )
+                    .await?;
 
                 if let Some(progress) = progress {
                     progress.finish_and_clear();
@@ -88,18 +90,23 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
                 let ns = namespace.as_deref().or(cli.namespace.as_deref());
 
                 let progress = if cli.show_progress {
-                    Some(crate::progress::ProgressTracker::new_spinner(true, "Discovering services..."))
+                    Some(crate::progress::ProgressTracker::new_spinner(
+                        true,
+                        "Discovering services...",
+                    ))
                 } else {
                     None
                 };
 
-                let result = discovery.list_services_with_options(
-                    ns,
-                    selector.as_deref(),
-                    cli.limit,
-                    cli.page_size,
-                    true, // Use cache
-                ).await?;
+                let result = discovery
+                    .list_services_with_options(
+                        ns,
+                        selector.as_deref(),
+                        cli.limit,
+                        cli.page_size,
+                        true, // Use cache
+                    )
+                    .await?;
 
                 if let Some(progress) = progress {
                     progress.finish_and_clear();
@@ -116,7 +123,12 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
             services = ResourceFilter::filter_services(services, &criteria);
 
             // Use streaming output for large datasets if requested
-            if cli.stream && matches!(cli.output, crate::cli::OutputFormat::Json | crate::cli::OutputFormat::Yaml) {
+            if cli.stream
+                && matches!(
+                    cli.output,
+                    crate::cli::OutputFormat::Json | crate::cli::OutputFormat::Yaml
+                )
+            {
                 if group_by.is_some() {
                     eprintln!("Warning: Grouping is not supported with streaming output. Falling back to regular output.");
                     output::print_services(&services, &cli.output)?;
@@ -157,15 +169,17 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
                 };
 
                 let namespaces = discovery.get_all_namespaces().await?;
-                let result = discovery.list_pods_concurrent(
-                    namespaces,
-                    selector.as_deref(),
-                    cli.limit,
-                    cli.page_size,
-                    true, // Use cache
-                    cli.concurrency,
-                    progress.as_ref(),
-                ).await?;
+                let result = discovery
+                    .list_pods_concurrent(
+                        namespaces,
+                        selector.as_deref(),
+                        cli.limit,
+                        cli.page_size,
+                        true, // Use cache
+                        cli.concurrency,
+                        progress.as_ref(),
+                    )
+                    .await?;
 
                 if let Some(progress) = progress {
                     progress.finish_and_clear();
@@ -177,18 +191,23 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
                 let ns = namespace.as_deref().or(cli.namespace.as_deref());
 
                 let progress = if cli.show_progress {
-                    Some(crate::progress::ProgressTracker::new_spinner(true, "Discovering pods..."))
+                    Some(crate::progress::ProgressTracker::new_spinner(
+                        true,
+                        "Discovering pods...",
+                    ))
                 } else {
                     None
                 };
 
-                let result = discovery.list_pods_with_options(
-                    ns,
-                    selector.as_deref(),
-                    cli.limit,
-                    cli.page_size,
-                    true, // Use cache
-                ).await?;
+                let result = discovery
+                    .list_pods_with_options(
+                        ns,
+                        selector.as_deref(),
+                        cli.limit,
+                        cli.page_size,
+                        true, // Use cache
+                    )
+                    .await?;
 
                 if let Some(progress) = progress {
                     progress.finish_and_clear();
@@ -235,17 +254,22 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
             };
 
             let progress = if cli.show_progress {
-                Some(crate::progress::ProgressTracker::new_spinner(true, "Discovering deployments..."))
+                Some(crate::progress::ProgressTracker::new_spinner(
+                    true,
+                    "Discovering deployments...",
+                ))
             } else {
                 None
             };
 
-            let mut deployments = discovery.list_deployments_with_options(
-                ns,
-                cli.limit,
-                cli.page_size,
-                true, // Use cache
-            ).await?;
+            let mut deployments = discovery
+                .list_deployments_with_options(
+                    ns,
+                    cli.limit,
+                    cli.page_size,
+                    true, // Use cache
+                )
+                .await?;
 
             if let Some(progress) = progress {
                 progress.finish_and_clear();
@@ -315,17 +339,22 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
             };
 
             let progress = if cli.show_progress {
-                Some(crate::progress::ProgressTracker::new_spinner(true, "Discovering configmaps..."))
+                Some(crate::progress::ProgressTracker::new_spinner(
+                    true,
+                    "Discovering configmaps...",
+                ))
             } else {
                 None
             };
 
-            let mut configmaps = discovery.list_configmaps_with_options(
-                ns,
-                cli.limit,
-                cli.page_size,
-                true, // Use cache
-            ).await?;
+            let mut configmaps = discovery
+                .list_configmaps_with_options(
+                    ns,
+                    cli.limit,
+                    cli.page_size,
+                    true, // Use cache
+                )
+                .await?;
 
             if let Some(progress) = progress {
                 progress.finish_and_clear();
@@ -536,7 +565,10 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
                     println!("  ConfigMaps entries: {}", stats.configmaps_entries);
                     println!("  Secrets entries: {}", stats.secrets_entries);
                     println!("  CRDs entries: {}", stats.crds_entries);
-                    println!("  Custom Resources entries: {}", stats.custom_resources_entries);
+                    println!(
+                        "  Custom Resources entries: {}",
+                        stats.custom_resources_entries
+                    );
                     println!("  Total entries: {}", stats.total_entries());
                     println!("  Default TTL: {:?}", stats.default_ttl);
                 }
@@ -546,9 +578,15 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
                     println!("Cache cleared successfully");
                 }
 
-                CacheAction::Warm { namespaces, resources } => {
+                CacheAction::Warm {
+                    namespaces,
+                    resources,
+                } => {
                     let progress = if cli.show_progress {
-                        Some(crate::progress::ProgressTracker::new_spinner(true, "Warming cache..."))
+                        Some(crate::progress::ProgressTracker::new_spinner(
+                            true,
+                            "Warming cache...",
+                        ))
                     } else {
                         None
                     };
@@ -560,7 +598,12 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
                     };
 
                     let target_resources = if resources.is_empty() {
-                        vec!["services".to_string(), "pods".to_string(), "deployments".to_string(), "configmaps".to_string()]
+                        vec![
+                            "services".to_string(),
+                            "pods".to_string(),
+                            "deployments".to_string(),
+                            "configmaps".to_string(),
+                        ]
                     } else {
                         resources.clone()
                     };
@@ -571,25 +614,55 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
                         match resource_type.as_str() {
                             "services" => {
                                 for namespace in &target_namespaces {
-                                    let _ = discovery.list_services_with_options(Some(namespace), None, None, 100, true).await;
+                                    let _ = discovery
+                                        .list_services_with_options(
+                                            Some(namespace),
+                                            None,
+                                            None,
+                                            100,
+                                            true,
+                                        )
+                                        .await;
                                     warmed_count += 1;
                                 }
                             }
                             "pods" => {
                                 for namespace in &target_namespaces {
-                                    let _ = discovery.list_pods_with_options(Some(namespace), None, None, 100, true).await;
+                                    let _ = discovery
+                                        .list_pods_with_options(
+                                            Some(namespace),
+                                            None,
+                                            None,
+                                            100,
+                                            true,
+                                        )
+                                        .await;
                                     warmed_count += 1;
                                 }
                             }
                             "deployments" => {
                                 for namespace in &target_namespaces {
-                                    let _ = discovery.list_deployments_with_options(Some(namespace), None, 100, true).await;
+                                    let _ = discovery
+                                        .list_deployments_with_options(
+                                            Some(namespace),
+                                            None,
+                                            100,
+                                            true,
+                                        )
+                                        .await;
                                     warmed_count += 1;
                                 }
                             }
                             "configmaps" => {
                                 for namespace in &target_namespaces {
-                                    let _ = discovery.list_configmaps_with_options(Some(namespace), None, 100, true).await;
+                                    let _ = discovery
+                                        .list_configmaps_with_options(
+                                            Some(namespace),
+                                            None,
+                                            100,
+                                            true,
+                                        )
+                                        .await;
                                     warmed_count += 1;
                                 }
                             }
@@ -603,12 +676,20 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
                         progress.finish_and_clear();
                     }
 
-                    println!("Cache warmed successfully: {} namespace/resource combinations loaded", warmed_count);
+                    println!(
+                        "Cache warmed successfully: {} namespace/resource combinations loaded",
+                        warmed_count
+                    );
                 }
             }
         }
 
-        Commands::Benchmark { iterations, resources, test_memory, test_concurrent } => {
+        Commands::Benchmark {
+            iterations,
+            resources,
+            test_memory,
+            test_concurrent,
+        } => {
             println!("🚀 Phase 2 Performance Benchmark");
             println!("================================");
 
@@ -631,41 +712,51 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
                         "services" => {
                             if test_concurrent {
                                 let namespaces = discovery.get_all_namespaces().await?;
-                                let _ = discovery.list_services_concurrent(
-                                    namespaces,
-                                    None,
-                                    Some(100),
-                                    50,
-                                    true,
-                                    cli.concurrency,
-                                    None,
-                                ).await?;
+                                let _ = discovery
+                                    .list_services_concurrent(
+                                        namespaces,
+                                        None,
+                                        Some(100),
+                                        50,
+                                        true,
+                                        cli.concurrency,
+                                        None,
+                                    )
+                                    .await?;
                             } else if test_memory {
-                                let _lazy_services = discovery.list_services_lazy(None, Some(100), 50).await?;
+                                let _lazy_services =
+                                    discovery.list_services_lazy(None, Some(100), 50).await?;
                                 // Consume the iterator to measure performance
                                 // let _: Vec<_> = lazy_services.collect();
                             } else {
-                                let _ = discovery.list_services_with_options(None, None, Some(100), 50, true).await?;
+                                let _ = discovery
+                                    .list_services_with_options(None, None, Some(100), 50, true)
+                                    .await?;
                             }
                         }
                         "pods" => {
                             if test_concurrent {
                                 let namespaces = discovery.get_all_namespaces().await?;
-                                let _ = discovery.list_pods_concurrent(
-                                    namespaces,
-                                    None,
-                                    Some(100),
-                                    50,
-                                    true,
-                                    cli.concurrency,
-                                    None,
-                                ).await?;
+                                let _ = discovery
+                                    .list_pods_concurrent(
+                                        namespaces,
+                                        None,
+                                        Some(100),
+                                        50,
+                                        true,
+                                        cli.concurrency,
+                                        None,
+                                    )
+                                    .await?;
                             } else if test_memory {
-                                let _lazy_pods = discovery.list_pods_lazy(None, Some(100), 50).await?;
+                                let _lazy_pods =
+                                    discovery.list_pods_lazy(None, Some(100), 50).await?;
                                 // Consume the iterator to measure performance
                                 // let _: Vec<_> = lazy_pods.collect();
                             } else {
-                                let _ = discovery.list_pods_with_options(None, None, Some(100), 50, true).await?;
+                                let _ = discovery
+                                    .list_pods_with_options(None, None, Some(100), 50, true)
+                                    .await?;
                             }
                         }
                         _ => {
@@ -691,7 +782,10 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
                 println!("  Estimated memory: {:.2} MB", avg_memory);
 
                 if test_concurrent {
-                    println!("  Mode: Concurrent discovery (concurrency: {})", cli.concurrency);
+                    println!(
+                        "  Mode: Concurrent discovery (concurrency: {})",
+                        cli.concurrency
+                    );
                 } else if test_memory {
                     println!("  Mode: Memory-optimized lazy conversion");
                 } else {

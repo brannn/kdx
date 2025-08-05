@@ -472,7 +472,15 @@ mod tests {
         }
 
         // Test cache warm
-        let args = vec!["kdx", "cache", "warm", "--namespaces", "default", "--namespaces", "kube-system"];
+        let args = vec![
+            "kdx",
+            "cache",
+            "warm",
+            "--namespaces",
+            "default",
+            "--namespaces",
+            "kube-system",
+        ];
         let cli = Cli::try_parse_from(args).unwrap();
         if let Commands::Cache { action } = cli.command {
             if let CacheAction::Warm { namespaces, .. } = action {
@@ -500,7 +508,13 @@ mod tests {
             "--test-concurrent",
         ];
         let cli = Cli::try_parse_from(args).unwrap();
-        if let Commands::Benchmark { iterations, resources, test_memory, test_concurrent } = cli.command {
+        if let Commands::Benchmark {
+            iterations,
+            resources,
+            test_memory,
+            test_concurrent,
+        } = cli.command
+        {
             assert_eq!(iterations, 10);
             assert_eq!(resources, vec!["services", "pods"]);
             assert!(test_memory);

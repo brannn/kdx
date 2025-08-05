@@ -71,6 +71,7 @@ impl DiscoveryEngine {
         }
     }
 
+    #[allow(dead_code)]
     pub fn with_cache_ttl(client: Client, cache_ttl: Duration) -> Self {
         Self {
             client,
@@ -107,7 +108,8 @@ impl DiscoveryEngine {
 
     /// List services in the specified namespace (or all namespaces if None)
     pub async fn list_services(&self, namespace: Option<&str>) -> Result<Vec<ServiceInfo>> {
-        self.list_services_with_options(namespace, None, None, 100, false).await
+        self.list_services_with_options(namespace, None, None, 100, false)
+            .await
     }
 
     /// List services with pagination and caching support
@@ -140,8 +142,7 @@ impl DiscoveryEngine {
         let mut fetched = 0;
 
         loop {
-            let mut list_params = kube::api::ListParams::default()
-                .limit(page_size as u32);
+            let mut list_params = kube::api::ListParams::default().limit(page_size as u32);
 
             if let Some(sel) = selector {
                 list_params = list_params.labels(sel);
@@ -174,7 +175,8 @@ impl DiscoveryEngine {
 
         // Cache the results if caching is enabled
         if use_cache {
-            self.cache.set_services(namespace, selector, all_services.clone());
+            self.cache
+                .set_services(namespace, selector, all_services.clone());
         }
 
         Ok(all_services)
@@ -186,7 +188,8 @@ impl DiscoveryEngine {
         namespace: Option<&str>,
         selector: Option<&str>,
     ) -> Result<Vec<PodInfo>> {
-        self.list_pods_with_options(namespace, selector, None, 100, false).await
+        self.list_pods_with_options(namespace, selector, None, 100, false)
+            .await
     }
 
     /// List pods with pagination and caching support
@@ -219,8 +222,7 @@ impl DiscoveryEngine {
         let mut fetched = 0;
 
         loop {
-            let mut list_params = kube::api::ListParams::default()
-                .limit(page_size as u32);
+            let mut list_params = kube::api::ListParams::default().limit(page_size as u32);
 
             if let Some(sel) = selector {
                 list_params = list_params.labels(sel);
@@ -276,8 +278,7 @@ impl DiscoveryEngine {
         let mut fetched = 0;
 
         loop {
-            let mut list_params = kube::api::ListParams::default()
-                .limit(page_size as u32);
+            let mut list_params = kube::api::ListParams::default().limit(page_size as u32);
 
             if let Some(token) = continue_token {
                 list_params = list_params.continue_token(&token);
@@ -322,8 +323,7 @@ impl DiscoveryEngine {
         let mut fetched = 0;
 
         loop {
-            let mut list_params = kube::api::ListParams::default()
-                .limit(page_size as u32);
+            let mut list_params = kube::api::ListParams::default().limit(page_size as u32);
 
             if let Some(token) = continue_token {
                 list_params = list_params.continue_token(&token);
@@ -352,6 +352,7 @@ impl DiscoveryEngine {
     }
 
     /// List services concurrently across multiple namespaces
+    #[allow(clippy::too_many_arguments)]
     pub async fn list_services_concurrent(
         &self,
         namespaces: Vec<String>,
@@ -371,11 +372,14 @@ impl DiscoveryEngine {
         let total_namespaces = namespaces.len();
 
         if let Some(progress) = progress {
-            progress.set_message(&format!("Discovering services across {} namespaces...", total_namespaces));
+            progress.set_message(&format!(
+                "Discovering services across {} namespaces...",
+                total_namespaces
+            ));
         }
 
         // Calculate per-namespace limit if global limit is specified
-        let per_namespace_limit = limit.map(|l| (l + namespaces.len() - 1) / namespaces.len());
+        let per_namespace_limit = limit.map(|l| l.div_ceil(namespaces.len()));
 
         for (index, namespace) in namespaces.into_iter().enumerate() {
             let engine = self.clone();
@@ -384,13 +388,15 @@ impl DiscoveryEngine {
 
             join_set.spawn(async move {
                 let _permit = permit;
-                let result = engine.list_services_with_options(
-                    Some(&namespace),
-                    selector.as_deref(),
-                    per_namespace_limit,
-                    page_size,
-                    use_cache,
-                ).await;
+                let result = engine
+                    .list_services_with_options(
+                        Some(&namespace),
+                        selector.as_deref(),
+                        per_namespace_limit,
+                        page_size,
+                        use_cache,
+                    )
+                    .await;
                 (index, namespace, result)
             });
         }
@@ -403,15 +409,21 @@ impl DiscoveryEngine {
 
             if let Some(progress) = progress {
                 progress.set_position(completed);
-                progress.set_message(&format!("Completed {}/{} namespaces", completed, total_namespaces));
+                progress.set_message(&format!(
+                    "Completed {}/{} namespaces",
+                    completed, total_namespaces
+                ));
             }
 
             match result {
-                Ok((_, namespace, Ok(services))) => {
+                Ok((_, _namespace, Ok(services))) => {
                     all_services.extend(services);
                 }
                 Ok((_, namespace, Err(e))) => {
-                    eprintln!("Warning: Failed to fetch services from namespace '{}': {}", namespace, e);
+                    eprintln!(
+                        "Warning: Failed to fetch services from namespace '{}': {}",
+                        namespace, e
+                    );
                 }
                 Err(e) => {
                     eprintln!("Warning: Task failed: {}", e);
@@ -431,6 +443,7 @@ impl DiscoveryEngine {
     }
 
     /// List pods concurrently across multiple namespaces
+    #[allow(clippy::too_many_arguments)]
     pub async fn list_pods_concurrent(
         &self,
         namespaces: Vec<String>,
@@ -450,11 +463,14 @@ impl DiscoveryEngine {
         let total_namespaces = namespaces.len();
 
         if let Some(progress) = progress {
-            progress.set_message(&format!("Discovering pods across {} namespaces...", total_namespaces));
+            progress.set_message(&format!(
+                "Discovering pods across {} namespaces...",
+                total_namespaces
+            ));
         }
 
         // Calculate per-namespace limit if global limit is specified
-        let per_namespace_limit = limit.map(|l| (l + namespaces.len() - 1) / namespaces.len());
+        let per_namespace_limit = limit.map(|l| l.div_ceil(namespaces.len()));
 
         for (index, namespace) in namespaces.into_iter().enumerate() {
             let engine = self.clone();
@@ -463,13 +479,15 @@ impl DiscoveryEngine {
 
             join_set.spawn(async move {
                 let _permit = permit;
-                let result = engine.list_pods_with_options(
-                    Some(&namespace),
-                    selector.as_deref(),
-                    per_namespace_limit,
-                    page_size,
-                    use_cache,
-                ).await;
+                let result = engine
+                    .list_pods_with_options(
+                        Some(&namespace),
+                        selector.as_deref(),
+                        per_namespace_limit,
+                        page_size,
+                        use_cache,
+                    )
+                    .await;
                 (index, namespace, result)
             });
         }
@@ -482,15 +500,21 @@ impl DiscoveryEngine {
 
             if let Some(progress) = progress {
                 progress.set_position(completed);
-                progress.set_message(&format!("Completed {}/{} namespaces", completed, total_namespaces));
+                progress.set_message(&format!(
+                    "Completed {}/{} namespaces",
+                    completed, total_namespaces
+                ));
             }
 
             match result {
-                Ok((_, namespace, Ok(pods))) => {
+                Ok((_, _namespace, Ok(pods))) => {
                     all_pods.extend(pods);
                 }
                 Ok((_, namespace, Err(e))) => {
-                    eprintln!("Warning: Failed to fetch pods from namespace '{}': {}", namespace, e);
+                    eprintln!(
+                        "Warning: Failed to fetch pods from namespace '{}': {}",
+                        namespace, e
+                    );
                 }
                 Err(e) => {
                     eprintln!("Warning: Task failed: {}", e);
@@ -658,8 +682,10 @@ impl DiscoveryEngine {
     }
 
     /// List deployments in the specified namespace (or all namespaces if None)
+    #[allow(dead_code)]
     pub async fn list_deployments(&self, namespace: Option<&str>) -> Result<Vec<DeploymentInfo>> {
-        self.list_deployments_with_options(namespace, None, 100, false).await
+        self.list_deployments_with_options(namespace, None, 100, false)
+            .await
     }
 
     /// List deployments with pagination and caching support
@@ -691,8 +717,7 @@ impl DiscoveryEngine {
         let mut fetched = 0;
 
         loop {
-            let mut list_params = kube::api::ListParams::default()
-                .limit(page_size as u32);
+            let mut list_params = kube::api::ListParams::default().limit(page_size as u32);
 
             if let Some(token) = continue_token {
                 list_params = list_params.continue_token(&token);
@@ -721,7 +746,8 @@ impl DiscoveryEngine {
 
         // Cache the results if caching is enabled
         if use_cache {
-            self.cache.set_deployments(namespace, all_deployments.clone());
+            self.cache
+                .set_deployments(namespace, all_deployments.clone());
         }
 
         Ok(all_deployments)
@@ -766,8 +792,10 @@ impl DiscoveryEngine {
     }
 
     /// List configmaps in the specified namespace (or all namespaces if None)
+    #[allow(dead_code)]
     pub async fn list_configmaps(&self, namespace: Option<&str>) -> Result<Vec<ConfigMapInfo>> {
-        self.list_configmaps_with_options(namespace, None, 100, false).await
+        self.list_configmaps_with_options(namespace, None, 100, false)
+            .await
     }
 
     /// List configmaps with pagination and caching support
@@ -799,8 +827,7 @@ impl DiscoveryEngine {
         let mut fetched = 0;
 
         loop {
-            let mut list_params = kube::api::ListParams::default()
-                .limit(page_size as u32);
+            let mut list_params = kube::api::ListParams::default().limit(page_size as u32);
 
             if let Some(token) = continue_token {
                 list_params = list_params.continue_token(&token);
@@ -828,7 +855,8 @@ impl DiscoveryEngine {
         }
 
         // Find associations with other resources
-        self.find_configmap_associations(&mut all_configmaps).await?;
+        self.find_configmap_associations(&mut all_configmaps)
+            .await?;
 
         // Cache the results if caching is enabled
         if use_cache {
@@ -1584,7 +1612,11 @@ impl LazyConvert<ServiceInfo> for Service {
         let namespace = self.metadata.namespace.as_ref()?.clone();
 
         let spec = self.spec.as_ref()?;
-        let service_type = spec.type_.as_ref().unwrap_or(&"ClusterIP".to_string()).clone();
+        let service_type = spec
+            .type_
+            .as_ref()
+            .unwrap_or(&"ClusterIP".to_string())
+            .clone();
         let cluster_ip = spec.cluster_ip.clone();
 
         let ports = spec.ports.as_ref().map(|ports| {
@@ -1900,7 +1932,7 @@ mod tests {
 
     #[test]
     fn test_lazy_convert_service() {
-        use k8s_openapi::api::core::v1::{Service, ServiceSpec, ServicePort as K8sServicePort};
+        use k8s_openapi::api::core::v1::{Service, ServicePort as K8sServicePort, ServiceSpec};
         use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
         use std::collections::BTreeMap;
 
@@ -1919,7 +1951,11 @@ mod tests {
         let port = K8sServicePort {
             name: Some("http".to_string()),
             port: 80,
-            target_port: Some(k8s_openapi::apimachinery::pkg::util::intstr::IntOrString::String("8080".to_string())),
+            target_port: Some(
+                k8s_openapi::apimachinery::pkg::util::intstr::IntOrString::String(
+                    "8080".to_string(),
+                ),
+            ),
             protocol: Some("TCP".to_string()),
             ..Default::default()
         };
@@ -1939,7 +1975,7 @@ mod tests {
 
     #[test]
     fn test_lazy_convert_pod() {
-        use k8s_openapi::api::core::v1::{Pod, PodSpec, PodStatus, Container, ContainerStatus};
+        use k8s_openapi::api::core::v1::{Container, ContainerStatus, Pod, PodSpec, PodStatus};
         use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 
         let mut pod = Pod::default();

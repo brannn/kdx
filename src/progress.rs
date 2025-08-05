@@ -15,18 +15,18 @@ impl ProgressTracker {
                 Some(t) => ProgressBar::new(t),
                 None => ProgressBar::new_spinner(),
             };
-            
+
             pb.set_style(
                 ProgressStyle::default_bar()
                     .template("{spinner:.green} [{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}")
                     .unwrap_or_else(|_| ProgressStyle::default_bar())
             );
-            
+
             Some(pb)
         } else {
             None
         };
-        
+
         Self { bar }
     }
 
@@ -37,14 +37,14 @@ impl ProgressTracker {
             pb.set_style(
                 ProgressStyle::default_spinner()
                     .template("{spinner:.green} {msg}")
-                    .unwrap_or_else(|_| ProgressStyle::default_spinner())
+                    .unwrap_or_else(|_| ProgressStyle::default_spinner()),
             );
             pb.set_message(message.to_string());
             Some(pb)
         } else {
             None
         };
-        
+
         Self { bar }
     }
 
@@ -56,6 +56,7 @@ impl ProgressTracker {
     }
 
     /// Increment progress by delta
+    #[allow(dead_code)]
     pub fn inc(&self, delta: u64) {
         if let Some(bar) = &self.bar {
             bar.inc(delta);
@@ -70,6 +71,7 @@ impl ProgressTracker {
     }
 
     /// Finish the progress bar with a message
+    #[allow(dead_code)]
     pub fn finish(&self) {
         if let Some(bar) = &self.bar {
             bar.finish_with_message("Complete");
@@ -117,7 +119,7 @@ mod tests {
     #[test]
     fn test_progress_operations() {
         let tracker = ProgressTracker::new(false, Some(100));
-        
+
         // These should not panic even with no progress bar
         tracker.set_message("Test");
         tracker.inc(10);

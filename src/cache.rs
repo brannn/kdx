@@ -72,7 +72,11 @@ impl ResourceCache {
     }
 
     /// Get services from cache
-    pub fn get_services(&self, namespace: Option<&str>, selector: Option<&str>) -> Option<Vec<ServiceInfo>> {
+    pub fn get_services(
+        &self,
+        namespace: Option<&str>,
+        selector: Option<&str>,
+    ) -> Option<Vec<ServiceInfo>> {
         let key = Self::namespace_key(namespace, selector);
         if let Some(entry) = self.services.get(&key) {
             if !entry.is_expired() {
@@ -86,14 +90,23 @@ impl ResourceCache {
     }
 
     /// Set services in cache
-    pub fn set_services(&self, namespace: Option<&str>, selector: Option<&str>, data: Vec<ServiceInfo>) {
+    pub fn set_services(
+        &self,
+        namespace: Option<&str>,
+        selector: Option<&str>,
+        data: Vec<ServiceInfo>,
+    ) {
         let key = Self::namespace_key(namespace, selector);
         let entry = CacheEntry::new(data, self.default_ttl);
         self.services.insert(key, entry);
     }
 
     /// Get pods from cache
-    pub fn get_pods(&self, namespace: Option<&str>, selector: Option<&str>) -> Option<Vec<PodInfo>> {
+    pub fn get_pods(
+        &self,
+        namespace: Option<&str>,
+        selector: Option<&str>,
+    ) -> Option<Vec<PodInfo>> {
         let key = Self::namespace_key(namespace, selector);
         if let Some(entry) = self.pods.get(&key) {
             if !entry.is_expired() {
@@ -133,6 +146,7 @@ impl ResourceCache {
     }
 
     /// Get statefulsets from cache
+    #[allow(dead_code)]
     pub fn get_statefulsets(&self, namespace: Option<&str>) -> Option<Vec<StatefulSetInfo>> {
         let key = Self::namespace_key(namespace, None);
         if let Some(entry) = self.statefulsets.get(&key) {
@@ -146,6 +160,7 @@ impl ResourceCache {
     }
 
     /// Set statefulsets in cache
+    #[allow(dead_code)]
     pub fn set_statefulsets(&self, namespace: Option<&str>, data: Vec<StatefulSetInfo>) {
         let key = Self::namespace_key(namespace, None);
         let entry = CacheEntry::new(data, self.default_ttl);
@@ -153,6 +168,7 @@ impl ResourceCache {
     }
 
     /// Get daemonsets from cache
+    #[allow(dead_code)]
     pub fn get_daemonsets(&self, namespace: Option<&str>) -> Option<Vec<DaemonSetInfo>> {
         let key = Self::namespace_key(namespace, None);
         if let Some(entry) = self.daemonsets.get(&key) {
@@ -166,6 +182,7 @@ impl ResourceCache {
     }
 
     /// Set daemonsets in cache
+    #[allow(dead_code)]
     pub fn set_daemonsets(&self, namespace: Option<&str>, data: Vec<DaemonSetInfo>) {
         let key = Self::namespace_key(namespace, None);
         let entry = CacheEntry::new(data, self.default_ttl);
@@ -193,6 +210,7 @@ impl ResourceCache {
     }
 
     /// Get secrets from cache
+    #[allow(dead_code)]
     pub fn get_secrets(&self, namespace: Option<&str>) -> Option<Vec<SecretInfo>> {
         let key = Self::namespace_key(namespace, None);
         if let Some(entry) = self.secrets.get(&key) {
@@ -206,6 +224,7 @@ impl ResourceCache {
     }
 
     /// Set secrets in cache
+    #[allow(dead_code)]
     pub fn set_secrets(&self, namespace: Option<&str>, data: Vec<SecretInfo>) {
         let key = Self::namespace_key(namespace, None);
         let entry = CacheEntry::new(data, self.default_ttl);
@@ -213,7 +232,12 @@ impl ResourceCache {
     }
 
     /// Get custom resources from cache
-    pub fn get_custom_resources(&self, crd_name: &str, namespace: Option<&str>) -> Option<Vec<CustomResourceInfo>> {
+    #[allow(dead_code)]
+    pub fn get_custom_resources(
+        &self,
+        crd_name: &str,
+        namespace: Option<&str>,
+    ) -> Option<Vec<CustomResourceInfo>> {
         let key = format!("{}:{}", crd_name, Self::namespace_key(namespace, None));
         if let Some(entry) = self.custom_resources.get(&key) {
             if !entry.is_expired() {
@@ -226,13 +250,20 @@ impl ResourceCache {
     }
 
     /// Set custom resources in cache
-    pub fn set_custom_resources(&self, crd_name: &str, namespace: Option<&str>, data: Vec<CustomResourceInfo>) {
+    #[allow(dead_code)]
+    pub fn set_custom_resources(
+        &self,
+        crd_name: &str,
+        namespace: Option<&str>,
+        data: Vec<CustomResourceInfo>,
+    ) {
         let key = format!("{}:{}", crd_name, Self::namespace_key(namespace, None));
         let entry = CacheEntry::new(data, self.default_ttl);
         self.custom_resources.insert(key, entry);
     }
 
     /// Get CRDs from cache
+    #[allow(dead_code)]
     pub fn get_crds(&self) -> Option<Vec<CRDInfo>> {
         let key = "all".to_string();
         if let Some(entry) = self.crds.get(&key) {
@@ -246,6 +277,7 @@ impl ResourceCache {
     }
 
     /// Set CRDs in cache
+    #[allow(dead_code)]
     pub fn set_crds(&self, data: Vec<CRDInfo>) {
         let key = "all".to_string();
         let entry = CacheEntry::new(data, self.default_ttl);
@@ -282,6 +314,7 @@ impl ResourceCache {
     }
 
     /// Clean up expired entries
+    #[allow(dead_code)]
     pub fn cleanup_expired(&self) {
         // Clean services
         self.services.retain(|_, entry| !entry.is_expired());
@@ -345,7 +378,7 @@ mod tests {
     fn test_cache_entry_expiration() {
         let data = vec![create_test_service()];
         let entry = CacheEntry::new(data, Duration::from_millis(1));
-        
+
         assert!(!entry.is_expired());
         std::thread::sleep(Duration::from_millis(2));
         assert!(entry.is_expired());
@@ -373,10 +406,19 @@ mod tests {
 
     #[test]
     fn test_namespace_key_generation() {
-        assert_eq!(ResourceCache::namespace_key(Some("default"), None), "default");
+        assert_eq!(
+            ResourceCache::namespace_key(Some("default"), None),
+            "default"
+        );
         assert_eq!(ResourceCache::namespace_key(None, None), "all");
-        assert_eq!(ResourceCache::namespace_key(Some("kube-system"), Some("app=nginx")), "kube-system:app=nginx");
-        assert_eq!(ResourceCache::namespace_key(None, Some("app=web")), "all:app=web");
+        assert_eq!(
+            ResourceCache::namespace_key(Some("kube-system"), Some("app=nginx")),
+            "kube-system:app=nginx"
+        );
+        assert_eq!(
+            ResourceCache::namespace_key(None, Some("app=web")),
+            "all:app=web"
+        );
     }
 
     #[test]
@@ -481,13 +523,17 @@ mod tests {
         }];
 
         cache.set_custom_resources("testresources", Some("default"), custom_resources.clone());
-        let cached = cache.get_custom_resources("testresources", Some("default")).unwrap();
+        let cached = cache
+            .get_custom_resources("testresources", Some("default"))
+            .unwrap();
         assert_eq!(cached.len(), 1);
         assert_eq!(cached[0].name, "test-cr");
         assert_eq!(cached[0].kind, "TestResource");
 
         // Test different CRD name
-        assert!(cache.get_custom_resources("other", Some("default")).is_none());
+        assert!(cache
+            .get_custom_resources("other", Some("default"))
+            .is_none());
     }
 
     #[test]

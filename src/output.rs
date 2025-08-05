@@ -9,7 +9,7 @@ use crate::discovery::{
 use crate::error::{ExplorerError, Result};
 use crate::filtering::GroupedResources;
 use colored::*;
-use std::io::{self, Write};
+use std::io::Write;
 use tabled::{Table, Tabled};
 
 /// Print services in the specified format
@@ -1254,7 +1254,10 @@ mod tests {
         let service = create_test_service();
         let result = streaming.write_item(&service);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Table format doesn't support streaming"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Table format doesn't support streaming"));
     }
 
     #[test]
