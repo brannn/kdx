@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.3.0] - 2025-08-05
+## [0.4.0] - 2025-08-05
 
 ### Added - Phase 2: Scale and Performance Infrastructure
 - Concurrent discovery across multiple namespaces with configurable concurrency limits

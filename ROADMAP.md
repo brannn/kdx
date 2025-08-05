@@ -99,7 +99,7 @@ Based on user feedback and technical analysis, the following areas require enhan
 - **Performance Features**: Progress tracking, cache management commands, and benchmarking tools
 - **Global Options**: --limit, --page-size, --show-progress, --concurrency, --stream, --memory-optimized
 - **Test Coverage**: 88 comprehensive tests (up from 23) with full performance validation
-- **Release**: kdx v0.3.1 with complete scale and performance infrastructure
+- **Release**: kdx v0.4.0 with complete scale and performance infrastructure
 
 ### Phase 3: RBAC and Permission Awareness
 
