@@ -1208,4 +1208,76 @@ mod tests {
         let result = print_statefulsets(&statefulsets, &OutputFormat::Json);
         assert!(result.is_ok());
     }
+
+    #[test]
+    fn test_streaming_output_json() {
+        let mut buffer = Vec::new();
+        let mut streaming = StreamingOutput::new(&mut buffer, OutputFormat::Json);
+
+        streaming.start_array().unwrap();
+
+        let service = create_test_service();
+        streaming.write_item(&service).unwrap();
+        streaming.write_item(&service).unwrap();
+
+        streaming.end_array().unwrap();
+
+        let output = String::from_utf8(buffer).unwrap();
+        assert!(output.starts_with('['));
+        assert!(output.ends_with("]\n"));
+        assert!(output.contains("test-service"));
+    }
+
+    #[test]
+    fn test_streaming_output_yaml() {
+        let mut buffer = Vec::new();
+        let mut streaming = StreamingOutput::new(&mut buffer, OutputFormat::Yaml);
+
+        streaming.start_array().unwrap();
+
+        let service = create_test_service();
+        streaming.write_item(&service).unwrap();
+        streaming.write_item(&service).unwrap();
+
+        streaming.end_array().unwrap();
+
+        let output = String::from_utf8(buffer).unwrap();
+        assert!(output.contains("---"));
+        assert!(output.contains("test-service"));
+    }
+
+    #[test]
+    fn test_streaming_output_table_error() {
+        let mut buffer = Vec::new();
+        let mut streaming = StreamingOutput::new(&mut buffer, OutputFormat::Table);
+
+        let service = create_test_service();
+        let result = streaming.write_item(&service);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Table format doesn't support streaming"));
+    }
+
+    #[test]
+    fn test_stream_services() {
+        let services = vec![create_test_service(), create_test_service()];
+        let mut buffer = Vec::new();
+
+        let result = stream_services(services.into_iter(), &mut buffer, &OutputFormat::Json);
+        assert!(result.is_ok());
+
+        let output = String::from_utf8(buffer).unwrap();
+        assert!(output.starts_with('['));
+        assert!(output.ends_with("]\n"));
+    }
+
+    fn create_test_service() -> ServiceInfo {
+        ServiceInfo {
+            name: "test-service".to_string(),
+            namespace: "default".to_string(),
+            service_type: "ClusterIP".to_string(),
+            cluster_ip: Some("10.0.0.1".to_string()),
+            ports: vec![],
+            selector: Some(std::collections::BTreeMap::new()),
+        }
+    }
 }

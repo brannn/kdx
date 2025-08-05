@@ -426,4 +426,87 @@ mod tests {
         assert!(matches!(cli.output, OutputFormat::Json));
         assert_eq!(cli.context, Some("test-context".to_string()));
     }
+
+    #[test]
+    fn test_cli_phase2_flags() {
+        let args = vec![
+            "kdx",
+            "services",
+            "--limit",
+            "50",
+            "--page-size",
+            "25",
+            "--show-progress",
+            "--concurrency",
+            "5",
+            "--stream",
+            "--memory-optimized",
+        ];
+        let cli = Cli::try_parse_from(args).unwrap();
+        assert_eq!(cli.limit, Some(50));
+        assert_eq!(cli.page_size, 25);
+        assert!(cli.show_progress);
+        assert_eq!(cli.concurrency, 5);
+        assert!(cli.stream);
+        assert!(cli.memory_optimized);
+    }
+
+    #[test]
+    fn test_cli_cache_commands() {
+        // Test cache stats
+        let args = vec!["kdx", "cache", "stats"];
+        let cli = Cli::try_parse_from(args).unwrap();
+        if let Commands::Cache { action } = cli.command {
+            assert!(matches!(action, CacheAction::Stats));
+        } else {
+            panic!("Expected Cache command");
+        }
+
+        // Test cache clear
+        let args = vec!["kdx", "cache", "clear"];
+        let cli = Cli::try_parse_from(args).unwrap();
+        if let Commands::Cache { action } = cli.command {
+            assert!(matches!(action, CacheAction::Clear));
+        } else {
+            panic!("Expected Cache command");
+        }
+
+        // Test cache warm
+        let args = vec!["kdx", "cache", "warm", "--namespaces", "default", "--namespaces", "kube-system"];
+        let cli = Cli::try_parse_from(args).unwrap();
+        if let Commands::Cache { action } = cli.command {
+            if let CacheAction::Warm { namespaces, .. } = action {
+                assert_eq!(namespaces, vec!["default", "kube-system"]);
+            } else {
+                panic!("Expected Warm action");
+            }
+        } else {
+            panic!("Expected Cache command");
+        }
+    }
+
+    #[test]
+    fn test_cli_benchmark_command() {
+        let args = vec![
+            "kdx",
+            "benchmark",
+            "--iterations",
+            "10",
+            "--resources",
+            "services",
+            "--resources",
+            "pods",
+            "--test-memory",
+            "--test-concurrent",
+        ];
+        let cli = Cli::try_parse_from(args).unwrap();
+        if let Commands::Benchmark { iterations, resources, test_memory, test_concurrent } = cli.command {
+            assert_eq!(iterations, 10);
+            assert_eq!(resources, vec!["services", "pods"]);
+            assert!(test_memory);
+            assert!(test_concurrent);
+        } else {
+            panic!("Expected Benchmark command");
+        }
+    }
 }

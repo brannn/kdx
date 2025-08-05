@@ -391,4 +391,127 @@ mod tests {
         cache.cleanup_expired();
         assert_eq!(cache.stats().services_entries, 0);
     }
+
+    #[test]
+    fn test_cache_deployments() {
+        let cache = ResourceCache::new(Duration::from_secs(60));
+
+        let deployments = vec![DeploymentInfo {
+            name: "test-deployment".to_string(),
+            namespace: "default".to_string(),
+            replicas: 3,
+            ready_replicas: 3,
+            available_replicas: 3,
+            strategy: "RollingUpdate".to_string(),
+            age: "1d".to_string(),
+            labels: std::collections::BTreeMap::new(),
+            selector: std::collections::BTreeMap::new(),
+        }];
+
+        // Test set and get
+        cache.set_deployments(Some("default"), deployments.clone());
+        let cached = cache.get_deployments(Some("default")).unwrap();
+        assert_eq!(cached.len(), 1);
+        assert_eq!(cached[0].name, "test-deployment");
+
+        // Test different namespace
+        assert!(cache.get_deployments(Some("other")).is_none());
+    }
+
+    #[test]
+    fn test_cache_configmaps() {
+        let cache = ResourceCache::new(Duration::from_secs(60));
+
+        let configmaps = vec![ConfigMapInfo {
+            name: "test-configmap".to_string(),
+            namespace: "default".to_string(),
+            data_keys: vec!["key1".to_string(), "key2".to_string()],
+            age: "1d".to_string(),
+            labels: std::collections::BTreeMap::new(),
+            used_by: vec![],
+            mount_paths: vec![],
+        }];
+
+        cache.set_configmaps(Some("default"), configmaps.clone());
+        let cached = cache.get_configmaps(Some("default")).unwrap();
+        assert_eq!(cached.len(), 1);
+        assert_eq!(cached[0].name, "test-configmap");
+        assert_eq!(cached[0].data_keys.len(), 2);
+    }
+
+    #[test]
+    fn test_cache_secrets() {
+        let cache = ResourceCache::new(Duration::from_secs(60));
+
+        let secrets = vec![SecretInfo {
+            name: "test-secret".to_string(),
+            namespace: "default".to_string(),
+            secret_type: "Opaque".to_string(),
+            data_keys: vec!["username".to_string(), "password".to_string()],
+            age: "1d".to_string(),
+            labels: std::collections::BTreeMap::new(),
+            used_by: vec![],
+            mount_paths: vec![],
+        }];
+
+        cache.set_secrets(Some("default"), secrets.clone());
+        let cached = cache.get_secrets(Some("default")).unwrap();
+        assert_eq!(cached.len(), 1);
+        assert_eq!(cached[0].name, "test-secret");
+        assert_eq!(cached[0].secret_type, "Opaque");
+    }
+
+    #[test]
+    fn test_cache_custom_resources() {
+        let cache = ResourceCache::new(Duration::from_secs(60));
+
+        let custom_resources = vec![CustomResourceInfo {
+            name: "test-cr".to_string(),
+            namespace: Some("default".to_string()),
+            crd_name: "testresources.example.com".to_string(),
+            group: "example.com".to_string(),
+            version: "v1".to_string(),
+            kind: "TestResource".to_string(),
+            age: "1d".to_string(),
+            labels: std::collections::BTreeMap::new(),
+            annotations: std::collections::BTreeMap::new(),
+            spec_summary: "{}".to_string(),
+            status_summary: None,
+            related_resources: vec![],
+        }];
+
+        cache.set_custom_resources("testresources", Some("default"), custom_resources.clone());
+        let cached = cache.get_custom_resources("testresources", Some("default")).unwrap();
+        assert_eq!(cached.len(), 1);
+        assert_eq!(cached[0].name, "test-cr");
+        assert_eq!(cached[0].kind, "TestResource");
+
+        // Test different CRD name
+        assert!(cache.get_custom_resources("other", Some("default")).is_none());
+    }
+
+    #[test]
+    fn test_cache_crds() {
+        let cache = ResourceCache::new(Duration::from_secs(60));
+
+        let crds = vec![CRDInfo {
+            name: "testresources.example.com".to_string(),
+            group: "example.com".to_string(),
+            version: "v1".to_string(),
+            kind: "TestResource".to_string(),
+            plural: "testresources".to_string(),
+            scope: "Namespaced".to_string(),
+            age: "1d".to_string(),
+            labels: std::collections::BTreeMap::new(),
+            instance_count: 0,
+            versions: vec![],
+            description: None,
+        }];
+
+        cache.set_crds(crds.clone());
+        let cached = cache.get_crds().unwrap();
+        assert_eq!(cached.len(), 1);
+        assert_eq!(cached[0].name, "testresources.example.com");
+        assert_eq!(cached[0].scope, "Namespaced");
+    }
 }

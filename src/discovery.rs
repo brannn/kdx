@@ -1897,4 +1897,131 @@ mod tests {
         );
         assert_eq!(statefulset.selector.len(), 4);
     }
+
+    #[test]
+    fn test_lazy_convert_service() {
+        use k8s_openapi::api::core::v1::{Service, ServiceSpec, ServicePort as K8sServicePort};
+        use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
+        use std::collections::BTreeMap;
+
+        let mut service = Service::default();
+        service.metadata = ObjectMeta {
+            name: Some("test-service".to_string()),
+            namespace: Some("default".to_string()),
+            ..Default::default()
+        };
+
+        let mut spec = ServiceSpec::default();
+        spec.type_ = Some("ClusterIP".to_string());
+        spec.cluster_ip = Some("10.0.0.1".to_string());
+        spec.selector = Some(BTreeMap::new());
+
+        let port = K8sServicePort {
+            name: Some("http".to_string()),
+            port: 80,
+            target_port: Some(k8s_openapi::apimachinery::pkg::util::intstr::IntOrString::String("8080".to_string())),
+            protocol: Some("TCP".to_string()),
+            ..Default::default()
+        };
+        spec.ports = Some(vec![port]);
+        service.spec = Some(spec);
+
+        let converted = service.lazy_convert().unwrap();
+        assert_eq!(converted.name, "test-service");
+        assert_eq!(converted.namespace, "default");
+        assert_eq!(converted.service_type, "ClusterIP");
+        assert_eq!(converted.cluster_ip, Some("10.0.0.1".to_string()));
+        assert_eq!(converted.ports.len(), 1);
+        assert_eq!(converted.ports[0].name, Some("http".to_string()));
+        assert_eq!(converted.ports[0].port, 80);
+        assert_eq!(converted.ports[0].target_port, "8080");
+    }
+
+    #[test]
+    fn test_lazy_convert_pod() {
+        use k8s_openapi::api::core::v1::{Pod, PodSpec, PodStatus, Container, ContainerStatus};
+        use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
+
+        let mut pod = Pod::default();
+        pod.metadata = ObjectMeta {
+            name: Some("test-pod".to_string()),
+            namespace: Some("default".to_string()),
+            ..Default::default()
+        };
+
+        let spec = PodSpec {
+            containers: vec![Container {
+                name: "test-container".to_string(),
+                ..Default::default()
+            }],
+            node_name: Some("test-node".to_string()),
+            ..Default::default()
+        };
+        pod.spec = Some(spec);
+
+        let status = PodStatus {
+            phase: Some("Running".to_string()),
+            pod_ip: Some("10.0.0.2".to_string()),
+            container_statuses: Some(vec![ContainerStatus {
+                name: "test-container".to_string(),
+                ready: true,
+                restart_count: 0,
+                ..Default::default()
+            }]),
+            ..Default::default()
+        };
+        pod.status = Some(status);
+
+        let converted = pod.lazy_convert().unwrap();
+        assert_eq!(converted.name, "test-pod");
+        assert_eq!(converted.namespace, "default");
+        assert_eq!(converted.phase, "Running");
+        assert_eq!(converted.pod_ip, Some("10.0.0.2".to_string()));
+        assert_eq!(converted.node_name, Some("test-node".to_string()));
+        assert_eq!(converted.ready_containers, 1);
+        assert_eq!(converted.total_containers, 1);
+        assert_eq!(converted.restart_count, 0);
+    }
+
+    #[test]
+    fn test_lazy_resource_iterator() {
+        use k8s_openapi::api::core::v1::{Service, ServiceSpec};
+        use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
+
+        let services = vec![
+            Service {
+                metadata: ObjectMeta {
+                    name: Some("service1".to_string()),
+                    namespace: Some("default".to_string()),
+                    ..Default::default()
+                },
+                spec: Some(ServiceSpec {
+                    type_: Some("ClusterIP".to_string()),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+            Service {
+                metadata: ObjectMeta {
+                    name: Some("service2".to_string()),
+                    namespace: Some("default".to_string()),
+                    ..Default::default()
+                },
+                spec: Some(ServiceSpec {
+                    type_: Some("NodePort".to_string()),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+        ];
+
+        let lazy_iter = LazyResourceIterator::new(services.into_iter());
+        let converted: Vec<ServiceInfo> = lazy_iter.collect();
+
+        assert_eq!(converted.len(), 2);
+        assert_eq!(converted[0].name, "service1");
+        assert_eq!(converted[0].service_type, "ClusterIP");
+        assert_eq!(converted[1].name, "service2");
+        assert_eq!(converted[1].service_type, "NodePort");
+    }
 }
