@@ -13,7 +13,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::task::JoinSet;
 /// Main discovery engine for Kubernetes resources
+#[derive(Clone)]
 pub struct DiscoveryEngine {
     client: Client,
     cache: Arc<ResourceCache>,
@@ -42,6 +44,23 @@ impl DiscoveryEngine {
     /// Clear cache
     pub fn clear_cache(&self) {
         self.cache.clear();
+    }
+
+    /// Get all namespaces in the cluster
+    pub async fn get_all_namespaces(&self) -> Result<Vec<String>> {
+        use k8s_openapi::api::core::v1::Namespace;
+
+        let namespaces: Api<Namespace> = Api::all(self.client.clone());
+        let namespace_list = namespaces.list(&Default::default()).await?;
+
+        let mut namespace_names = Vec::new();
+        for namespace in namespace_list.items {
+            if let Some(name) = namespace.metadata.name {
+                namespace_names.push(name);
+            }
+        }
+
+        Ok(namespace_names)
     }
 
     /// List services in the specified namespace (or all namespaces if None)
@@ -193,6 +212,164 @@ impl DiscoveryEngine {
         // Cache the results if caching is enabled
         if use_cache {
             self.cache.set_pods(namespace, selector, all_pods.clone());
+        }
+
+        Ok(all_pods)
+    }
+
+    /// List services concurrently across multiple namespaces
+    pub async fn list_services_concurrent(
+        &self,
+        namespaces: Vec<String>,
+        selector: Option<&str>,
+        limit: Option<usize>,
+        page_size: usize,
+        use_cache: bool,
+        concurrency_limit: usize,
+        progress: Option<&ProgressTracker>,
+    ) -> Result<Vec<ServiceInfo>> {
+        if namespaces.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut join_set = JoinSet::new();
+        let semaphore = Arc::new(tokio::sync::Semaphore::new(concurrency_limit));
+        let total_namespaces = namespaces.len();
+
+        if let Some(progress) = progress {
+            progress.set_message(&format!("Discovering services across {} namespaces...", total_namespaces));
+        }
+
+        // Calculate per-namespace limit if global limit is specified
+        let per_namespace_limit = limit.map(|l| (l + namespaces.len() - 1) / namespaces.len());
+
+        for (index, namespace) in namespaces.into_iter().enumerate() {
+            let engine = self.clone();
+            let selector = selector.map(|s| s.to_string());
+            let permit = semaphore.clone().acquire_owned().await.unwrap();
+
+            join_set.spawn(async move {
+                let _permit = permit;
+                let result = engine.list_services_with_options(
+                    Some(&namespace),
+                    selector.as_deref(),
+                    per_namespace_limit,
+                    page_size,
+                    use_cache,
+                ).await;
+                (index, namespace, result)
+            });
+        }
+
+        let mut all_services = Vec::new();
+        let mut completed = 0;
+
+        while let Some(result) = join_set.join_next().await {
+            completed += 1;
+
+            if let Some(progress) = progress {
+                progress.set_position(completed);
+                progress.set_message(&format!("Completed {}/{} namespaces", completed, total_namespaces));
+            }
+
+            match result {
+                Ok((_, namespace, Ok(services))) => {
+                    all_services.extend(services);
+                }
+                Ok((_, namespace, Err(e))) => {
+                    eprintln!("Warning: Failed to fetch services from namespace '{}': {}", namespace, e);
+                }
+                Err(e) => {
+                    eprintln!("Warning: Task failed: {}", e);
+                }
+            }
+
+            // Apply global limit if specified
+            if let Some(limit) = limit {
+                if all_services.len() >= limit {
+                    all_services.truncate(limit);
+                    break;
+                }
+            }
+        }
+
+        Ok(all_services)
+    }
+
+    /// List pods concurrently across multiple namespaces
+    pub async fn list_pods_concurrent(
+        &self,
+        namespaces: Vec<String>,
+        selector: Option<&str>,
+        limit: Option<usize>,
+        page_size: usize,
+        use_cache: bool,
+        concurrency_limit: usize,
+        progress: Option<&ProgressTracker>,
+    ) -> Result<Vec<PodInfo>> {
+        if namespaces.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut join_set = JoinSet::new();
+        let semaphore = Arc::new(tokio::sync::Semaphore::new(concurrency_limit));
+        let total_namespaces = namespaces.len();
+
+        if let Some(progress) = progress {
+            progress.set_message(&format!("Discovering pods across {} namespaces...", total_namespaces));
+        }
+
+        // Calculate per-namespace limit if global limit is specified
+        let per_namespace_limit = limit.map(|l| (l + namespaces.len() - 1) / namespaces.len());
+
+        for (index, namespace) in namespaces.into_iter().enumerate() {
+            let engine = self.clone();
+            let selector = selector.map(|s| s.to_string());
+            let permit = semaphore.clone().acquire_owned().await.unwrap();
+
+            join_set.spawn(async move {
+                let _permit = permit;
+                let result = engine.list_pods_with_options(
+                    Some(&namespace),
+                    selector.as_deref(),
+                    per_namespace_limit,
+                    page_size,
+                    use_cache,
+                ).await;
+                (index, namespace, result)
+            });
+        }
+
+        let mut all_pods = Vec::new();
+        let mut completed = 0;
+
+        while let Some(result) = join_set.join_next().await {
+            completed += 1;
+
+            if let Some(progress) = progress {
+                progress.set_position(completed);
+                progress.set_message(&format!("Completed {}/{} namespaces", completed, total_namespaces));
+            }
+
+            match result {
+                Ok((_, namespace, Ok(pods))) => {
+                    all_pods.extend(pods);
+                }
+                Ok((_, namespace, Err(e))) => {
+                    eprintln!("Warning: Failed to fetch pods from namespace '{}': {}", namespace, e);
+                }
+                Err(e) => {
+                    eprintln!("Warning: Task failed: {}", e);
+                }
+            }
+
+            // Apply global limit if specified
+            if let Some(limit) = limit {
+                if all_pods.len() >= limit {
+                    all_pods.truncate(limit);
+                    break;
+                }
+            }
         }
 
         Ok(all_pods)

@@ -59,30 +59,54 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
             selector,
             group_by,
         } => {
-            let ns = if all_namespaces {
-                None
+            let mut services = if all_namespaces {
+                // Use concurrent discovery for all namespaces
+                let progress = if cli.show_progress {
+                    Some(crate::progress::ProgressTracker::new(true, None))
+                } else {
+                    None
+                };
+
+                let namespaces = discovery.get_all_namespaces().await?;
+                let result = discovery.list_services_concurrent(
+                    namespaces,
+                    selector.as_deref(),
+                    cli.limit,
+                    cli.page_size,
+                    true, // Use cache
+                    cli.concurrency,
+                    progress.as_ref(),
+                ).await?;
+
+                if let Some(progress) = progress {
+                    progress.finish_and_clear();
+                }
+
+                result
             } else {
-                namespace.as_deref().or(cli.namespace.as_deref())
+                // Single namespace discovery
+                let ns = namespace.as_deref().or(cli.namespace.as_deref());
+
+                let progress = if cli.show_progress {
+                    Some(crate::progress::ProgressTracker::new_spinner(true, "Discovering services..."))
+                } else {
+                    None
+                };
+
+                let result = discovery.list_services_with_options(
+                    ns,
+                    selector.as_deref(),
+                    cli.limit,
+                    cli.page_size,
+                    true, // Use cache
+                ).await?;
+
+                if let Some(progress) = progress {
+                    progress.finish_and_clear();
+                }
+
+                result
             };
-
-            // Create progress tracker for long operations
-            let progress = if cli.show_progress {
-                Some(crate::progress::ProgressTracker::new_spinner(true, "Discovering services..."))
-            } else {
-                None
-            };
-
-            let mut services = discovery.list_services_with_options(
-                ns,
-                selector.as_deref(),
-                cli.limit,
-                cli.page_size,
-                true, // Use cache
-            ).await?;
-
-            if let Some(progress) = progress {
-                progress.finish_and_clear();
-            }
 
             // Apply filtering
             let criteria = FilterCriteria {
@@ -114,30 +138,54 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
             status,
             group_by,
         } => {
-            let ns = if all_namespaces {
-                None
+            let mut pods = if all_namespaces {
+                // Use concurrent discovery for all namespaces
+                let progress = if cli.show_progress {
+                    Some(crate::progress::ProgressTracker::new(true, None))
+                } else {
+                    None
+                };
+
+                let namespaces = discovery.get_all_namespaces().await?;
+                let result = discovery.list_pods_concurrent(
+                    namespaces,
+                    selector.as_deref(),
+                    cli.limit,
+                    cli.page_size,
+                    true, // Use cache
+                    cli.concurrency,
+                    progress.as_ref(),
+                ).await?;
+
+                if let Some(progress) = progress {
+                    progress.finish_and_clear();
+                }
+
+                result
             } else {
-                namespace.as_deref().or(cli.namespace.as_deref())
+                // Single namespace discovery
+                let ns = namespace.as_deref().or(cli.namespace.as_deref());
+
+                let progress = if cli.show_progress {
+                    Some(crate::progress::ProgressTracker::new_spinner(true, "Discovering pods..."))
+                } else {
+                    None
+                };
+
+                let result = discovery.list_pods_with_options(
+                    ns,
+                    selector.as_deref(),
+                    cli.limit,
+                    cli.page_size,
+                    true, // Use cache
+                ).await?;
+
+                if let Some(progress) = progress {
+                    progress.finish_and_clear();
+                }
+
+                result
             };
-
-            // Create progress tracker for long operations
-            let progress = if cli.show_progress {
-                Some(crate::progress::ProgressTracker::new_spinner(true, "Discovering pods..."))
-            } else {
-                None
-            };
-
-            let mut pods = discovery.list_pods_with_options(
-                ns,
-                selector.as_deref(),
-                cli.limit,
-                cli.page_size,
-                true, // Use cache
-            ).await?;
-
-            if let Some(progress) = progress {
-                progress.finish_and_clear();
-            }
 
             // Apply additional filtering
             let criteria = FilterCriteria {

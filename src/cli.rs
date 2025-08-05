@@ -39,6 +39,10 @@ pub struct Cli {
     /// Show progress for long operations
     #[clap(long, global = true)]
     pub show_progress: bool,
+
+    /// Maximum concurrent operations (default: 10)
+    #[clap(long, global = true, default_value = "10")]
+    pub concurrency: usize,
 }
 
 #[derive(Subcommand)]

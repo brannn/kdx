@@ -236,11 +236,8 @@ mod tests {
             namespace: "default".to_string(),
             service_type: "ClusterIP".to_string(),
             cluster_ip: Some("10.0.0.1".to_string()),
-            external_ip: None,
             ports: vec![],
-            age: "1d".to_string(),
-            labels: BTreeMap::new(),
-            selector: BTreeMap::new(),
+            selector: Some(BTreeMap::new()),
         }
     }
 
