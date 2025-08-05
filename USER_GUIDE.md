@@ -8,9 +8,12 @@ Complete documentation for all kdx commands and features.
 - [Configuration Management](#configuration-management)
 - [Custom Resources](#custom-resources)
 - [Service Analysis](#service-analysis)
+- [Performance and Scale](#performance-and-scale)
+- [Cache Management](#cache-management)
 - [Advanced Filtering](#advanced-filtering)
 - [Resource Grouping](#resource-grouping)
 - [Output Formats](#output-formats)
+- [Global Options](#global-options)
 
 ## Core Resource Commands
 
@@ -33,6 +36,12 @@ kdx services --group-by app
 
 # Output in JSON format
 kdx services --output json
+
+# High-performance discovery with progress tracking
+kdx services --all-namespaces --concurrency 15 --show-progress
+
+# Stream large datasets efficiently
+kdx services --all-namespaces --stream --output json --limit 1000
 ```
 
 ### Pods
@@ -56,6 +65,12 @@ kdx pods --group-by app
 
 # Check pods across environments
 kdx pods --selector 'env in (prod,staging)' --all-namespaces
+
+# Concurrent discovery with progress tracking
+kdx pods --all-namespaces --concurrency 20 --show-progress
+
+# Memory-efficient processing of large pod lists
+kdx pods --all-namespaces --limit 500 --page-size 50
 ```
 
 ### Deployments
@@ -253,6 +268,130 @@ kdx graph --namespace monitoring | dot -Tpng -o services.png
 kdx graph --namespace monitoring | dot -Tsvg -o services.svg
 ```
 
+## Performance and Scale
+
+kdx is designed to handle large Kubernetes clusters efficiently through concurrent discovery, intelligent caching, and memory optimization features.
+
+### Concurrent Discovery
+
+Process multiple namespaces in parallel for faster resource discovery.
+
+```bash
+# Use concurrent discovery across all namespaces
+kdx services --all-namespaces --concurrency 20
+
+# Concurrent pod discovery with progress tracking
+kdx pods --all-namespaces --show-progress --concurrency 15
+
+# Limit concurrent operations for resource-constrained environments
+kdx deployments --all-namespaces --concurrency 5
+```
+
+### Pagination and Limits
+
+Handle large datasets efficiently with pagination and result limiting.
+
+```bash
+# Limit total results
+kdx services --limit 100
+
+# Use smaller page sizes for API calls
+kdx services --page-size 25
+
+# Combine with other options
+kdx pods --all-namespaces --limit 500 --page-size 50 --show-progress
+```
+
+### Memory Optimization
+
+Use streaming output and lazy conversion for large datasets.
+
+```bash
+# Stream JSON output for large datasets
+kdx services --stream --output json --limit 1000
+
+# Stream YAML output
+kdx pods --stream --output yaml --all-namespaces
+
+# Enable memory optimization features
+kdx services --memory-optimized --all-namespaces
+```
+
+### Progress Tracking
+
+Monitor long-running operations with real-time progress indicators.
+
+```bash
+# Show progress for service discovery
+kdx services --all-namespaces --show-progress
+
+# Progress tracking with concurrent operations
+kdx pods --all-namespaces --concurrency 10 --show-progress
+
+# Progress tracking for cache operations
+kdx cache warm --show-progress
+```
+
+## Cache Management
+
+kdx includes intelligent caching to improve performance for repeated operations.
+
+### Cache Statistics
+
+View current cache status and performance metrics.
+
+```bash
+# Show detailed cache statistics
+kdx cache stats
+
+# Example output:
+# Cache Statistics:
+#   Services entries: 19
+#   Pods entries: 19
+#   Deployments entries: 12
+#   Total entries: 50
+#   Default TTL: 5m0s
+```
+
+### Cache Operations
+
+Manage cache lifecycle for optimal performance.
+
+```bash
+# Clear all cached data
+kdx cache clear
+
+# Warm cache for better performance
+kdx cache warm
+
+# Warm specific namespaces
+kdx cache warm --namespaces production staging
+
+# Warm specific resource types
+kdx cache warm --resources services pods
+```
+
+### Performance Testing
+
+Benchmark kdx performance with your cluster configuration.
+
+```bash
+# Basic performance benchmark
+kdx benchmark
+
+# Test with more iterations
+kdx benchmark --iterations 10
+
+# Test concurrent discovery performance
+kdx benchmark --test-concurrent
+
+# Test memory optimization features
+kdx benchmark --test-memory
+
+# Benchmark specific resource types
+kdx benchmark --resources services pods deployments
+```
+
 ## Advanced Filtering
 
 ### Label Selector Syntax
@@ -436,3 +575,65 @@ kdx pods --selector 'app.kubernetes.io/instance=prometheus' --group-by app
 kdx services --selector 'app.kubernetes.io/instance=prometheus'
 kdx configmaps --selector 'app.kubernetes.io/instance=prometheus'
 ```
+
+## Global Options
+
+These options are available for all kdx commands and can be combined for optimal performance and usability.
+
+### Performance Options
+
+```bash
+# Pagination and result limiting
+--limit <number>              # Limit total results returned
+--page-size <number>          # Set API request page size (default: 100)
+
+# Concurrent operations
+--concurrency <number>        # Set maximum concurrent operations (default: 10)
+--show-progress              # Display progress indicators for long operations
+
+# Memory optimization
+--stream                     # Use streaming output for large datasets (JSON/YAML only)
+--memory-optimized          # Enable memory optimization features
+```
+
+### Standard Options
+
+```bash
+# Namespace targeting
+--namespace <name>           # Target specific namespace
+--all-namespaces            # Query across all namespaces
+
+# Output control
+--output <format>           # Output format: table (default), json, yaml
+--verbose                   # Enable verbose output
+
+# Kubernetes context
+--context <name>            # Use specific kubeconfig context
+```
+
+### Usage Examples
+
+```bash
+# High-performance discovery across large cluster
+kdx services --all-namespaces --concurrency 20 --limit 1000 --show-progress
+
+# Memory-efficient export of large dataset
+kdx pods --all-namespaces --stream --output json --limit 5000 > pods.json
+
+# Detailed analysis with progress tracking
+kdx deployments --all-namespaces --verbose --show-progress --page-size 50
+
+# Quick targeted discovery
+kdx services --namespace production --limit 20 --output yaml
+```
+
+### Performance Recommendations
+
+For optimal performance with large clusters:
+
+1. **Use concurrent discovery**: Set `--concurrency` based on your cluster size and API server capacity
+2. **Enable progress tracking**: Use `--show-progress` for long-running operations
+3. **Limit results**: Use `--limit` to avoid processing unnecessary data
+4. **Stream large datasets**: Use `--stream` with JSON/YAML output for datasets over 1000 items
+5. **Warm the cache**: Run `kdx cache warm` before batch operations
+6. **Monitor cache performance**: Use `kdx cache stats` to verify cache effectiveness

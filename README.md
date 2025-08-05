@@ -2,14 +2,14 @@
 
 
 [![Build Status](https://github.com/brannn/kdx/actions/workflows/ci.yml/badge.svg)](https://github.com/brannn/kdx/actions)
-[![Tests](https://img.shields.io/badge/tests-23%20passing-brightgreen.svg)](https://github.com/brannn/kdx/actions)
+[![Tests](https://img.shields.io/badge/tests-88%20passing-brightgreen.svg)](https://github.com/brannn/kdx/actions)
 [![Release](https://img.shields.io/github/v/release/brannn/kdx?label=release)](https://github.com/brannn/kdx/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/rust-1.70+-blue.svg)](https://www.rust-lang.org)
 [![Homebrew](https://img.shields.io/badge/homebrew-available-brightgreen.svg)](https://github.com/brannn/homebrew-kdx)
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey.svg)](https://github.com/brannn/kdx)
 
-A command-line tool for exploring and discovering resources in Kubernetes clusters. Provides commands for listing services, pods, and understanding cluster topology and relationships.
+A command-line tool for exploring and discovering resources in Kubernetes clusters. Provides commands for listing services, pods, and understanding cluster topology and relationships. Designed for performance and scale with large clusters through concurrent discovery, intelligent caching, and memory-efficient processing.
 
 ## Quick Demo
 
@@ -73,6 +73,27 @@ Service Topology: grafana
 
 $ kdx graph --namespace production --output dot > services.dot
 # Generate visual dependency graphs for architecture documentation
+```
+
+### Performance and Scale Features
+
+```console
+$ kdx services --all-namespaces --limit 50 --show-progress --concurrency 10
+
+Discovering services across 19 namespaces...
+Completed 19/19 namespaces
+
+NAME           NAMESPACE      TYPE           CLUSTER-IP     PORT(S)        AGE
+api-gateway    production     LoadBalancer   10.43.132.227  80:30080/TCP   5d
+auth-service   production     ClusterIP      10.43.132.228  8080/TCP       5d
+...
+
+$ kdx cache warm --show-progress
+Warming cache...
+Cache warmed successfully: 76 namespace/resource combinations loaded
+
+$ kdx services --stream --output json --limit 1000 > large-dataset.json
+# Stream large datasets without loading everything into memory
 ```
 
 **📖 For comprehensive documentation and examples of all commands, see the [User Guide](USER_GUIDE.md)**
@@ -160,6 +181,14 @@ $ kdx services --namespace production --output yaml
 - **Security Analysis**: Secret usage patterns without exposing sensitive data
 - **Multiple Output Formats**: Table, JSON, and YAML output for all resource types
 
+### Performance and Scale
+- **Concurrent Discovery**: Parallel resource fetching across multiple namespaces
+- **Intelligent Caching**: Automatic caching with configurable TTL for improved performance
+- **Pagination Support**: Handle large datasets with configurable page sizes and limits
+- **Memory Optimization**: Streaming output and lazy conversion for large clusters
+- **Progress Tracking**: Real-time progress indicators for long-running operations
+- **Cache Management**: Built-in cache warming, statistics, and cleanup commands
+
 ## Installation
 
 ### Homebrew (Recommended)
@@ -214,6 +243,7 @@ kdx provides comprehensive Kubernetes resource discovery and analysis:
 - **Configuration**: `configmaps`, `secrets` (with usage tracking and security analysis)
 - **Custom Resources**: `crds`, `custom-resources` (with version analysis)
 - **Service Analysis**: `describe`, `topology`, `graph` (dependency visualization)
+- **Performance**: `cache` (management), `benchmark` (performance testing)
 
 **📖 See the [User Guide](USER_GUIDE.md) for complete documentation and examples of all commands.**
 ### Core Resource Commands
@@ -278,6 +308,25 @@ kdx graph -n monitoring                         # Generate service dependency gr
 kdx graph --output dot                          # Generate DOT format graph
 ```
 
+### Performance and Scale
+
+```bash
+# Large Cluster Operations
+kdx services --all-namespaces --limit 100 --show-progress    # Progress tracking
+kdx services --all-namespaces --concurrency 20               # Concurrent discovery
+kdx services --stream --output json --limit 1000             # Memory-efficient streaming
+
+# Cache Management
+kdx cache stats                                 # Show cache statistics
+kdx cache warm --show-progress                  # Pre-load cache for better performance
+kdx cache clear                                 # Clear all cached data
+
+# Performance Testing
+kdx benchmark --iterations 5                   # Test standard performance
+kdx benchmark --test-concurrent                # Test concurrent discovery
+kdx benchmark --test-memory                    # Test memory optimization
+```
+
 ### Output Formats
 
 kdx supports multiple output formats:
@@ -291,6 +340,27 @@ kdx services --output json
 
 # YAML output
 kdx services --output yaml
+```
+
+### Global Options
+
+These options work with all commands:
+
+```bash
+# Pagination and limits
+kdx services --limit 50                        # Limit results to 50 items
+kdx services --page-size 25                    # Use smaller page sizes for API calls
+
+# Performance options
+kdx services --show-progress                   # Show progress indicators
+kdx services --concurrency 15                 # Set concurrent operation limit
+kdx services --stream --output json           # Use streaming output for large datasets
+kdx services --memory-optimized               # Enable memory optimization features
+
+# Standard options
+kdx services --namespace production           # Target specific namespace
+kdx services --all-namespaces                # Query across all namespaces
+kdx services --verbose                        # Enable verbose output
 ```
 
 ### Namespace Options
