@@ -224,7 +224,22 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
                 namespace.as_deref().or(cli.namespace.as_deref())
             };
 
-            let mut deployments = discovery.list_deployments(ns).await?;
+            let progress = if cli.show_progress {
+                Some(crate::progress::ProgressTracker::new_spinner(true, "Discovering deployments..."))
+            } else {
+                None
+            };
+
+            let mut deployments = discovery.list_deployments_with_options(
+                ns,
+                cli.limit,
+                cli.page_size,
+                true, // Use cache
+            ).await?;
+
+            if let Some(progress) = progress {
+                progress.finish_and_clear();
+            }
 
             // Apply filtering
             let criteria = FilterCriteria {
@@ -289,7 +304,22 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
                 namespace.as_deref().or(cli.namespace.as_deref())
             };
 
-            let mut configmaps = discovery.list_configmaps(ns).await?;
+            let progress = if cli.show_progress {
+                Some(crate::progress::ProgressTracker::new_spinner(true, "Discovering configmaps..."))
+            } else {
+                None
+            };
+
+            let mut configmaps = discovery.list_configmaps_with_options(
+                ns,
+                cli.limit,
+                cli.page_size,
+                true, // Use cache
+            ).await?;
+
+            if let Some(progress) = progress {
+                progress.finish_and_clear();
+            }
 
             // Apply filtering
             let criteria = FilterCriteria {
@@ -477,6 +507,93 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
                 }
                 cli::GraphFormat::Svg => {
                     println!("{}", service_graph.to_svg()?);
+                }
+            }
+        }
+
+        Commands::Cache { action } => {
+            use cli::CacheAction;
+
+            match action {
+                CacheAction::Stats => {
+                    let stats = discovery.cache_stats();
+                    println!("Cache Statistics:");
+                    println!("  Services entries: {}", stats.services_entries);
+                    println!("  Pods entries: {}", stats.pods_entries);
+                    println!("  Deployments entries: {}", stats.deployments_entries);
+                    println!("  StatefulSets entries: {}", stats.statefulsets_entries);
+                    println!("  DaemonSets entries: {}", stats.daemonsets_entries);
+                    println!("  ConfigMaps entries: {}", stats.configmaps_entries);
+                    println!("  Secrets entries: {}", stats.secrets_entries);
+                    println!("  CRDs entries: {}", stats.crds_entries);
+                    println!("  Custom Resources entries: {}", stats.custom_resources_entries);
+                    println!("  Total entries: {}", stats.total_entries());
+                    println!("  Default TTL: {:?}", stats.default_ttl);
+                }
+
+                CacheAction::Clear => {
+                    discovery.clear_cache();
+                    println!("Cache cleared successfully");
+                }
+
+                CacheAction::Warm { namespaces, resources } => {
+                    let progress = if cli.show_progress {
+                        Some(crate::progress::ProgressTracker::new_spinner(true, "Warming cache..."))
+                    } else {
+                        None
+                    };
+
+                    let target_namespaces = if namespaces.is_empty() {
+                        discovery.get_all_namespaces().await?
+                    } else {
+                        namespaces.clone()
+                    };
+
+                    let target_resources = if resources.is_empty() {
+                        vec!["services".to_string(), "pods".to_string(), "deployments".to_string(), "configmaps".to_string()]
+                    } else {
+                        resources.clone()
+                    };
+
+                    let mut warmed_count = 0;
+
+                    for resource_type in &target_resources {
+                        match resource_type.as_str() {
+                            "services" => {
+                                for namespace in &target_namespaces {
+                                    let _ = discovery.list_services_with_options(Some(namespace), None, None, 100, true).await;
+                                    warmed_count += 1;
+                                }
+                            }
+                            "pods" => {
+                                for namespace in &target_namespaces {
+                                    let _ = discovery.list_pods_with_options(Some(namespace), None, None, 100, true).await;
+                                    warmed_count += 1;
+                                }
+                            }
+                            "deployments" => {
+                                for namespace in &target_namespaces {
+                                    let _ = discovery.list_deployments_with_options(Some(namespace), None, 100, true).await;
+                                    warmed_count += 1;
+                                }
+                            }
+                            "configmaps" => {
+                                for namespace in &target_namespaces {
+                                    let _ = discovery.list_configmaps_with_options(Some(namespace), None, 100, true).await;
+                                    warmed_count += 1;
+                                }
+                            }
+                            _ => {
+                                eprintln!("Warning: Unknown resource type '{}'", resource_type);
+                            }
+                        }
+                    }
+
+                    if let Some(progress) = progress {
+                        progress.finish_and_clear();
+                    }
+
+                    println!("Cache warmed successfully: {} namespace/resource combinations loaded", warmed_count);
                 }
             }
         }

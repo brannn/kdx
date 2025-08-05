@@ -264,6 +264,29 @@ pub enum Commands {
         #[clap(long)]
         highlight: Option<String>,
     },
+
+    /// Cache management operations
+    Cache {
+        #[clap(subcommand)]
+        action: CacheAction,
+    },
+}
+
+#[derive(Parser)]
+pub enum CacheAction {
+    /// Show cache statistics
+    Stats,
+    /// Clear all cached data
+    Clear,
+    /// Warm cache by pre-loading common resources
+    Warm {
+        /// Namespaces to warm (default: all)
+        #[clap(long)]
+        namespaces: Vec<String>,
+        /// Resource types to warm (default: all)
+        #[clap(long)]
+        resources: Vec<String>,
+    },
 }
 
 #[derive(Debug, Clone, ValueEnum)]

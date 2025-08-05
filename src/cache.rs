@@ -132,6 +132,106 @@ impl ResourceCache {
         self.deployments.insert(key, entry);
     }
 
+    /// Get statefulsets from cache
+    pub fn get_statefulsets(&self, namespace: Option<&str>) -> Option<Vec<StatefulSetInfo>> {
+        let key = Self::namespace_key(namespace, None);
+        if let Some(entry) = self.statefulsets.get(&key) {
+            if !entry.is_expired() {
+                return Some(entry.data().clone());
+            } else {
+                self.statefulsets.remove(&key);
+            }
+        }
+        None
+    }
+
+    /// Set statefulsets in cache
+    pub fn set_statefulsets(&self, namespace: Option<&str>, data: Vec<StatefulSetInfo>) {
+        let key = Self::namespace_key(namespace, None);
+        let entry = CacheEntry::new(data, self.default_ttl);
+        self.statefulsets.insert(key, entry);
+    }
+
+    /// Get daemonsets from cache
+    pub fn get_daemonsets(&self, namespace: Option<&str>) -> Option<Vec<DaemonSetInfo>> {
+        let key = Self::namespace_key(namespace, None);
+        if let Some(entry) = self.daemonsets.get(&key) {
+            if !entry.is_expired() {
+                return Some(entry.data().clone());
+            } else {
+                self.daemonsets.remove(&key);
+            }
+        }
+        None
+    }
+
+    /// Set daemonsets in cache
+    pub fn set_daemonsets(&self, namespace: Option<&str>, data: Vec<DaemonSetInfo>) {
+        let key = Self::namespace_key(namespace, None);
+        let entry = CacheEntry::new(data, self.default_ttl);
+        self.daemonsets.insert(key, entry);
+    }
+
+    /// Get configmaps from cache
+    pub fn get_configmaps(&self, namespace: Option<&str>) -> Option<Vec<ConfigMapInfo>> {
+        let key = Self::namespace_key(namespace, None);
+        if let Some(entry) = self.configmaps.get(&key) {
+            if !entry.is_expired() {
+                return Some(entry.data().clone());
+            } else {
+                self.configmaps.remove(&key);
+            }
+        }
+        None
+    }
+
+    /// Set configmaps in cache
+    pub fn set_configmaps(&self, namespace: Option<&str>, data: Vec<ConfigMapInfo>) {
+        let key = Self::namespace_key(namespace, None);
+        let entry = CacheEntry::new(data, self.default_ttl);
+        self.configmaps.insert(key, entry);
+    }
+
+    /// Get secrets from cache
+    pub fn get_secrets(&self, namespace: Option<&str>) -> Option<Vec<SecretInfo>> {
+        let key = Self::namespace_key(namespace, None);
+        if let Some(entry) = self.secrets.get(&key) {
+            if !entry.is_expired() {
+                return Some(entry.data().clone());
+            } else {
+                self.secrets.remove(&key);
+            }
+        }
+        None
+    }
+
+    /// Set secrets in cache
+    pub fn set_secrets(&self, namespace: Option<&str>, data: Vec<SecretInfo>) {
+        let key = Self::namespace_key(namespace, None);
+        let entry = CacheEntry::new(data, self.default_ttl);
+        self.secrets.insert(key, entry);
+    }
+
+    /// Get custom resources from cache
+    pub fn get_custom_resources(&self, crd_name: &str, namespace: Option<&str>) -> Option<Vec<CustomResourceInfo>> {
+        let key = format!("{}:{}", crd_name, Self::namespace_key(namespace, None));
+        if let Some(entry) = self.custom_resources.get(&key) {
+            if !entry.is_expired() {
+                return Some(entry.data().clone());
+            } else {
+                self.custom_resources.remove(&key);
+            }
+        }
+        None
+    }
+
+    /// Set custom resources in cache
+    pub fn set_custom_resources(&self, crd_name: &str, namespace: Option<&str>, data: Vec<CustomResourceInfo>) {
+        let key = format!("{}:{}", crd_name, Self::namespace_key(namespace, None));
+        let entry = CacheEntry::new(data, self.default_ttl);
+        self.custom_resources.insert(key, entry);
+    }
+
     /// Get CRDs from cache
     pub fn get_crds(&self) -> Option<Vec<CRDInfo>> {
         let key = "all".to_string();

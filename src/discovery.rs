@@ -525,21 +525,72 @@ impl DiscoveryEngine {
 
     /// List deployments in the specified namespace (or all namespaces if None)
     pub async fn list_deployments(&self, namespace: Option<&str>) -> Result<Vec<DeploymentInfo>> {
+        self.list_deployments_with_options(namespace, None, 100, false).await
+    }
+
+    /// List deployments with pagination and caching support
+    pub async fn list_deployments_with_options(
+        &self,
+        namespace: Option<&str>,
+        limit: Option<usize>,
+        page_size: usize,
+        use_cache: bool,
+    ) -> Result<Vec<DeploymentInfo>> {
+        // Check cache first if enabled
+        if use_cache {
+            if let Some(cached) = self.cache.get_deployments(namespace) {
+                return Ok(if let Some(limit) = limit {
+                    cached.into_iter().take(limit).collect()
+                } else {
+                    cached
+                });
+            }
+        }
+
         let deployments: Api<Deployment> = match namespace {
             Some(ns) => Api::namespaced(self.client.clone(), ns),
             None => Api::all(self.client.clone()),
         };
 
-        let deployment_list = deployments.list(&Default::default()).await?;
+        let mut all_deployments = Vec::new();
+        let mut continue_token: Option<String> = None;
+        let mut fetched = 0;
 
-        let mut deployment_infos = Vec::new();
-        for deployment in deployment_list.items {
-            if let Some(deployment_info) = self.convert_deployment_to_info(deployment).await {
-                deployment_infos.push(deployment_info);
+        loop {
+            let mut list_params = kube::api::ListParams::default()
+                .limit(page_size as u32);
+
+            if let Some(token) = continue_token {
+                list_params = list_params.continue_token(&token);
+            }
+
+            let deployment_list = deployments.list(&list_params).await?;
+
+            for deployment in deployment_list.items {
+                if let Some(limit) = limit {
+                    if fetched >= limit {
+                        break;
+                    }
+                }
+
+                if let Some(deployment_info) = self.convert_deployment_to_info(deployment).await {
+                    all_deployments.push(deployment_info);
+                    fetched += 1;
+                }
+            }
+
+            continue_token = deployment_list.metadata.continue_;
+            if continue_token.is_none() || (limit.is_some() && fetched >= limit.unwrap()) {
+                break;
             }
         }
 
-        Ok(deployment_infos)
+        // Cache the results if caching is enabled
+        if use_cache {
+            self.cache.set_deployments(namespace, all_deployments.clone());
+        }
+
+        Ok(all_deployments)
     }
 
     /// List statefulsets in the specified namespace (or all namespaces if None)
@@ -582,25 +633,75 @@ impl DiscoveryEngine {
 
     /// List configmaps in the specified namespace (or all namespaces if None)
     pub async fn list_configmaps(&self, namespace: Option<&str>) -> Result<Vec<ConfigMapInfo>> {
+        self.list_configmaps_with_options(namespace, None, 100, false).await
+    }
+
+    /// List configmaps with pagination and caching support
+    pub async fn list_configmaps_with_options(
+        &self,
+        namespace: Option<&str>,
+        limit: Option<usize>,
+        page_size: usize,
+        use_cache: bool,
+    ) -> Result<Vec<ConfigMapInfo>> {
+        // Check cache first if enabled
+        if use_cache {
+            if let Some(cached) = self.cache.get_configmaps(namespace) {
+                return Ok(if let Some(limit) = limit {
+                    cached.into_iter().take(limit).collect()
+                } else {
+                    cached
+                });
+            }
+        }
+
         let configmaps: Api<ConfigMap> = match namespace {
             Some(ns) => Api::namespaced(self.client.clone(), ns),
             None => Api::all(self.client.clone()),
         };
 
-        let configmap_list = configmaps.list(&Default::default()).await?;
+        let mut all_configmaps = Vec::new();
+        let mut continue_token: Option<String> = None;
+        let mut fetched = 0;
 
-        let mut configmap_infos = Vec::new();
-        for configmap in configmap_list.items {
-            if let Some(configmap_info) = self.convert_configmap_to_info(configmap).await {
-                configmap_infos.push(configmap_info);
+        loop {
+            let mut list_params = kube::api::ListParams::default()
+                .limit(page_size as u32);
+
+            if let Some(token) = continue_token {
+                list_params = list_params.continue_token(&token);
+            }
+
+            let configmap_list = configmaps.list(&list_params).await?;
+
+            for configmap in configmap_list.items {
+                if let Some(limit) = limit {
+                    if fetched >= limit {
+                        break;
+                    }
+                }
+
+                if let Some(configmap_info) = self.convert_configmap_to_info(configmap).await {
+                    all_configmaps.push(configmap_info);
+                    fetched += 1;
+                }
+            }
+
+            continue_token = configmap_list.metadata.continue_;
+            if continue_token.is_none() || (limit.is_some() && fetched >= limit.unwrap()) {
+                break;
             }
         }
 
         // Find associations with other resources
-        self.find_configmap_associations(&mut configmap_infos)
-            .await?;
+        self.find_configmap_associations(&mut all_configmaps).await?;
 
-        Ok(configmap_infos)
+        // Cache the results if caching is enabled
+        if use_cache {
+            self.cache.set_configmaps(namespace, all_configmaps.clone());
+        }
+
+        Ok(all_configmaps)
     }
 
     /// List secrets in the specified namespace (or all namespaces if None)
