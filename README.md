@@ -29,26 +29,28 @@ $ kdx graph --namespace production --output dot | dot -Tpng -o architecture.png
 # Generate visual dependency graphs showing service relationships, ingress routes, and pod connections
 ```
 
-### Concurrent Discovery and Performance
+### Unused Resource Detection and Cleanup
 
 ```console
-$ kdx services --all-namespaces --show-progress --limit 100
+$ kdx configmaps --unused --all-namespaces
 
-Discovering services across 47 namespaces...
-Completed 47/47 namespaces (2.3s)
+NAME                NAMESPACE     DATA   AGE    USED BY
+old-config          staging       3      30d    None
+deprecated-settings production    1      45d    None
+legacy-app-config   development   5      120d   None
 
-NAME           NAMESPACE      TYPE           CLUSTER-IP     PORT(S)        AGE
-api-gateway    production     LoadBalancer   10.43.132.227  80:30080/TCP   5d
-grafana        monitoring     ClusterIP      10.43.145.12   3000/TCP       12d
-coredns        kube-system    ClusterIP      10.43.0.10     53:53/UDP      30d
-auth-service   staging        ClusterIP      10.43.132.228  8080/TCP       3d
-...
+$ kdx secrets --unused --all-namespaces
+
+NAME                TYPE                NAMESPACE     AGE    USED BY
+old-tls-cert        kubernetes.io/tls   staging       60d    None
+unused-api-key      Opaque              production    90d    None
+test-credentials    Opaque              development   180d   None
 ```
 
-Performance features:
-- Automatic concurrent processing across namespaces for optimal speed
-- `--show-progress`: Display real-time progress with timing information
-- Intelligent caching system provides fast repeat queries
+Cleanup capabilities:
+- Identify ConfigMaps and Secrets not referenced by any pods or deployments
+- Cross-reference usage across all namespaces automatically
+- Safe cleanup recommendations for cluster maintenance
 
 ### Advanced Resource Discovery
 
