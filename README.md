@@ -13,56 +13,10 @@ A command-line tool for exploring and discovering resources in Kubernetes cluste
 
 ## Quick Demo
 
-### Comprehensive Resource Discovery with Advanced Filtering
+### 🎯 Visual Service Topology & Dependency Mapping
 
 ```console
-$ kdx deployments --selector 'app=web,tier!=cache' --group-by helm-release
-
-=== Deployment Group: web-frontend (helm-release) ===
-NAME           NAMESPACE    READY   UP-TO-DATE   AVAILABLE   AGE
-web-frontend   production   3/3     3            3           5d
-web-api        production   2/2     2            2           5d
-
-Total deployments in group: 2
-```
-
-### Configuration Management and Security Analysis
-
-```console
-$ kdx configmaps --unused --all-namespaces
-
-NAME                NAMESPACE     DATA   AGE    USED BY
-old-config          staging       3      30d    None
-deprecated-settings production    1      45d    None
-
-$ kdx secrets --secret-type kubernetes.io/tls --group-by namespace
-
-=== Secret Group: production (namespace) ===
-NAME              TYPE                AGE    USED BY
-api-tls-cert      kubernetes.io/tls   90d    ingress-nginx
-auth-tls-cert     kubernetes.io/tls   45d    auth-service
-```
-
-### Custom Resource Discovery and Analysis
-
-```console
-$ kdx crds --with-instances --show-versions
-
-NAME                              GROUP                 VERSION   INSTANCES   AGE
-prometheuses.monitoring.coreos.com monitoring.coreos.com v1        3          90d
-certificates.cert-manager.io      cert-manager.io       v1        12         120d
-
-$ kdx custom-resources prometheuses.monitoring.coreos.com
-
-NAME                 NAMESPACE    VERSION   REPLICAS   AGE
-prometheus-main      monitoring   v2.45.0   2          90d
-prometheus-federate  monitoring   v2.45.0   1          60d
-```
-
-### Service Topology and Dependency Analysis
-
-```console
-$ kdx topology --namespace monitoring grafana
+$ kdx topology grafana --namespace monitoring
 
 Service Topology: grafana
 ├── Namespace: monitoring
@@ -71,29 +25,60 @@ Service Topology: grafana
 └── Backend Pods:
     └── grafana-5df9c4787-fxl27 (Running)
 
-$ kdx graph --namespace production --output dot > services.dot
-# Generate visual dependency graphs for architecture documentation
+$ kdx graph --namespace production --output dot | dot -Tpng -o architecture.png
+# Generate visual dependency graphs showing service relationships, ingress routes, and pod connections
 ```
 
-### Performance and Scale Features
+### ⚡ High-Performance Concurrent Discovery
 
 ```console
-$ kdx services --all-namespaces --limit 50 --show-progress --concurrency 10
+$ kdx services --all-namespaces --concurrency 20 --show-progress --limit 100
 
-Discovering services across 19 namespaces...
-Completed 19/19 namespaces
+Discovering services across 47 namespaces...
+[████████████████████████████████████████] 47/47 namespaces (2.3s)
 
 NAME           NAMESPACE      TYPE           CLUSTER-IP     PORT(S)        AGE
 api-gateway    production     LoadBalancer   10.43.132.227  80:30080/TCP   5d
 auth-service   production     ClusterIP      10.43.132.228  8080/TCP       5d
 ...
+```
+**Performance Features:**
+- `--concurrency 20`: Process 20 namespaces simultaneously (vs kubectl's sequential processing)
+- `--show-progress`: Real-time progress bar with timing and completion status
+- Intelligent caching with TTL for sub-second repeat queries
 
-$ kdx cache warm --show-progress
-Warming cache...
-Cache warmed successfully: 76 namespace/resource combinations loaded
+### 🔍 Advanced Resource Discovery & Analysis
 
-$ kdx services --stream --output json --limit 1000 > large-dataset.json
-# Stream large datasets without loading everything into memory
+```console
+$ kdx deployments --selector 'app=web,tier!=cache' --group-by helm-release --unused
+
+=== Deployment Group: web-frontend (helm-release) ===
+NAME           NAMESPACE    READY   UP-TO-DATE   AVAILABLE   STATUS
+web-frontend   production   3/3     3            3           Ready
+web-api        production   2/2     2            2           Ready
+
+$ kdx crds --with-instances --show-versions
+
+NAME                              GROUP                 VERSION   INSTANCES   AGE
+prometheuses.monitoring.coreos.com monitoring.coreos.com v1        3          90d
+certificates.cert-manager.io      cert-manager.io       v1        12         120d
+```
+
+### 🛡️ Configuration Management & Security Analysis
+
+```console
+$ kdx configmaps --unused --all-namespaces
+
+NAME                NAMESPACE     DATA   AGE    USED BY
+old-config          staging       3      30d    None ⚠️
+deprecated-settings production    1      45d    None ⚠️
+
+$ kdx secrets --secret-type kubernetes.io/tls --group-by namespace
+
+=== Secret Group: production (namespace) ===
+NAME              TYPE                AGE    USED BY
+api-tls-cert      kubernetes.io/tls   90d    ingress-nginx
+auth-tls-cert     kubernetes.io/tls   45d    auth-service
 ```
 
 **📖 For comprehensive documentation and examples of all commands, see the [User Guide](USER_GUIDE.md)**
