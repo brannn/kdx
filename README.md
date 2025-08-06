@@ -39,7 +39,9 @@ Completed 47/47 namespaces (2.3s)
 
 NAME           NAMESPACE      TYPE           CLUSTER-IP     PORT(S)        AGE
 api-gateway    production     LoadBalancer   10.43.132.227  80:30080/TCP   5d
-auth-service   production     ClusterIP      10.43.132.228  8080/TCP       5d
+grafana        monitoring     ClusterIP      10.43.145.12   3000/TCP       12d
+coredns        kube-system    ClusterIP      10.43.0.10     53:53/UDP      30d
+auth-service   staging        ClusterIP      10.43.132.228  8080/TCP       3d
 ...
 ```
 
