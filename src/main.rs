@@ -75,7 +75,7 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
                         cli.limit,
                         cli.page_size,
                         true, // Use cache
-                        cli.concurrency,
+                        20, // Optimal concurrency for most clusters
                         progress.as_ref(),
                     )
                     .await?;
@@ -176,7 +176,7 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
                         cli.limit,
                         cli.page_size,
                         true, // Use cache
-                        cli.concurrency,
+                        20, // Optimal concurrency for most clusters
                         progress.as_ref(),
                     )
                     .await?;
@@ -719,7 +719,7 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
                                         Some(100),
                                         50,
                                         true,
-                                        cli.concurrency,
+                                        20, // Optimal concurrency for benchmarks
                                         None,
                                     )
                                     .await?;
@@ -744,7 +744,7 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
                                         Some(100),
                                         50,
                                         true,
-                                        cli.concurrency,
+                                        20, // Optimal concurrency for benchmarks
                                         None,
                                     )
                                     .await?;
@@ -782,10 +782,7 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
                 println!("  Estimated memory: {:.2} MB", avg_memory);
 
                 if test_concurrent {
-                    println!(
-                        "  Mode: Concurrent discovery (concurrency: {})",
-                        cli.concurrency
-                    );
+                    println!("  Mode: Concurrent discovery");
                 } else if test_memory {
                     println!("  Mode: Memory-optimized lazy conversion");
                 } else {

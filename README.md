@@ -32,7 +32,7 @@ $ kdx graph --namespace production --output dot | dot -Tpng -o architecture.png
 ### Concurrent Discovery and Performance
 
 ```console
-$ kdx services --all-namespaces --concurrency 20 --show-progress --limit 100
+$ kdx services --all-namespaces --show-progress --limit 100
 
 Discovering services across 47 namespaces...
 Completed 47/47 namespaces (2.3s)
@@ -45,10 +45,10 @@ auth-service   staging        ClusterIP      10.43.132.228  8080/TCP       3d
 ...
 ```
 
-Options explained:
-- `--concurrency 20`: Process 20 namespaces simultaneously (kubectl processes sequentially)
+Performance features:
+- Automatic concurrent processing across namespaces for optimal speed
 - `--show-progress`: Display real-time progress with timing information
-- Caching system provides fast repeat queries
+- Intelligent caching system provides fast repeat queries
 
 ### Advanced Resource Discovery
 
@@ -301,7 +301,6 @@ kdx graph --output dot                          # Generate DOT format graph
 ```bash
 # Large Cluster Operations
 kdx services --all-namespaces --limit 100 --show-progress    # Progress tracking
-kdx services --all-namespaces --concurrency 20               # Concurrent discovery
 kdx services --stream --output json --limit 1000             # Memory-efficient streaming
 
 # Cache Management
@@ -341,7 +340,6 @@ kdx services --page-size 25                    # Use smaller page sizes for API 
 
 # Performance options
 kdx services --show-progress                   # Show progress indicators
-kdx services --concurrency 15                 # Set concurrent operation limit
 kdx services --stream --output json           # Use streaming output for large datasets
 kdx services --memory-optimized               # Enable memory optimization features
 

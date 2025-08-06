@@ -40,9 +40,7 @@ pub struct Cli {
     #[clap(long, global = true)]
     pub show_progress: bool,
 
-    /// Maximum concurrent operations (default: 10)
-    #[clap(long, global = true, default_value = "10")]
-    pub concurrency: usize,
+
 
     /// Use streaming output for large datasets (JSON/YAML only)
     #[clap(long, global = true)]
@@ -437,8 +435,6 @@ mod tests {
             "--page-size",
             "25",
             "--show-progress",
-            "--concurrency",
-            "5",
             "--stream",
             "--memory-optimized",
         ];
@@ -446,7 +442,6 @@ mod tests {
         assert_eq!(cli.limit, Some(50));
         assert_eq!(cli.page_size, 25);
         assert!(cli.show_progress);
-        assert_eq!(cli.concurrency, 5);
         assert!(cli.stream);
         assert!(cli.memory_optimized);
     }

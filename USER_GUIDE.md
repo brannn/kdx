@@ -38,7 +38,7 @@ kdx services --group-by app
 kdx services --output json
 
 # High-performance discovery with progress tracking
-kdx services --all-namespaces --concurrency 15 --show-progress
+kdx services --all-namespaces --show-progress
 
 # Stream large datasets efficiently
 kdx services --all-namespaces --stream --output json --limit 1000
@@ -66,8 +66,8 @@ kdx pods --group-by app
 # Check pods across environments
 kdx pods --selector 'env in (prod,staging)' --all-namespaces
 
-# Concurrent discovery with progress tracking
-kdx pods --all-namespaces --concurrency 20 --show-progress
+# Discovery with progress tracking
+kdx pods --all-namespaces --show-progress
 
 # Memory-efficient processing of large pod lists
 kdx pods --all-namespaces --limit 500 --page-size 50
@@ -274,17 +274,17 @@ kdx is designed to handle large Kubernetes clusters efficiently through concurre
 
 ### Concurrent Discovery
 
-Process multiple namespaces in parallel for faster resource discovery.
+kdx automatically processes multiple namespaces in parallel for faster resource discovery when using `--all-namespaces`.
 
 ```bash
-# Use concurrent discovery across all namespaces
-kdx services --all-namespaces --concurrency 20
+# Automatic concurrent discovery across all namespaces
+kdx services --all-namespaces
 
-# Concurrent pod discovery with progress tracking
-kdx pods --all-namespaces --show-progress --concurrency 15
+# Concurrent discovery with progress tracking
+kdx pods --all-namespaces --show-progress
 
-# Limit concurrent operations for resource-constrained environments
-kdx deployments --all-namespaces --concurrency 5
+# All multi-namespace operations use optimal concurrency automatically
+kdx deployments --all-namespaces
 ```
 
 ### Pagination and Limits
@@ -325,8 +325,8 @@ Monitor long-running operations with real-time progress indicators.
 # Show progress for service discovery
 kdx services --all-namespaces --show-progress
 
-# Progress tracking with concurrent operations
-kdx pods --all-namespaces --concurrency 10 --show-progress
+# Progress tracking for multi-namespace operations
+kdx pods --all-namespaces --show-progress
 
 # Progress tracking for cache operations
 kdx cache warm --show-progress
@@ -587,8 +587,7 @@ These options are available for all kdx commands and can be combined for optimal
 --limit <number>              # Limit total results returned
 --page-size <number>          # Set API request page size (default: 100)
 
-# Concurrent operations
---concurrency <number>        # Set maximum concurrent operations (default: 10)
+# Progress tracking
 --show-progress              # Display progress indicators for long operations
 
 # Memory optimization
@@ -615,7 +614,7 @@ These options are available for all kdx commands and can be combined for optimal
 
 ```bash
 # High-performance discovery across large cluster
-kdx services --all-namespaces --concurrency 20 --limit 1000 --show-progress
+kdx services --all-namespaces --limit 1000 --show-progress
 
 # Memory-efficient export of large dataset
 kdx pods --all-namespaces --stream --output json --limit 5000 > pods.json
@@ -631,7 +630,7 @@ kdx services --namespace production --limit 20 --output yaml
 
 For optimal performance with large clusters:
 
-1. **Use concurrent discovery**: Set `--concurrency` based on your cluster size and API server capacity
+1. **Automatic concurrent discovery**: kdx automatically uses optimal concurrency for multi-namespace operations
 2. **Enable progress tracking**: Use `--show-progress` for long-running operations
 3. **Limit results**: Use `--limit` to avoid processing unnecessary data
 4. **Stream large datasets**: Use `--stream` with JSON/YAML output for datasets over 1000 items
