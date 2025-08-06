@@ -233,7 +233,7 @@ kdx provides comprehensive Kubernetes resource discovery and analysis:
 - **Service Analysis**: `describe`, `topology`, `graph` (dependency visualization)
 - **Performance**: `cache` (management), `benchmark` (performance testing)
 
-**📖 See the [User Guide](USER_GUIDE.md) for complete documentation and examples of all commands.**
+**See the [User Guide](USER_GUIDE.md) for complete documentation and examples of all commands.**
 ### Core Resource Commands
 
 ```bash
