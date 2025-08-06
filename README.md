@@ -44,7 +44,7 @@ auth-service   production     ClusterIP      10.43.132.228  8080/TCP       5d
 ```
 
 Options explained:
-- `--concurrency 20`: Process 20 namespaces simultaneously
+- `--concurrency 20`: Process 20 namespaces simultaneously (kubectl processes sequentially)
 - `--show-progress`: Display real-time progress with timing information
 - Caching system provides fast repeat queries
 
