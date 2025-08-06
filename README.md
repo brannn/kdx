@@ -84,7 +84,7 @@ api-tls-cert      kubernetes.io/tls   90d    ingress-nginx
 auth-tls-cert     kubernetes.io/tls   45d    auth-service
 ```
 
-**📖 For comprehensive documentation and examples of all commands, see the [User Guide](USER_GUIDE.md)**
+**For comprehensive documentation and examples of all commands, see the [User Guide](USER_GUIDE.md)**
 
 ```console
 $ kdx services --namespace production --selector 'service.kubernetes.io/load-balancer-cleanup'
