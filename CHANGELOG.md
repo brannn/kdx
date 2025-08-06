@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.4.2] - 2025-08-06
+
+### Changed
+- Removed `--concurrency` CLI option - now uses optimal defaults automatically
+- Simplified user experience by removing unnecessary complexity
+- Updated documentation to focus on practical features over implementation details
+
+### Improved
+- README now leads with most powerful features (topology analysis, unused resource detection)
+- Removed all emojis and boastful language from documentation
+- Better examples showing multi-namespace operations
+- Cleaner CLI with fewer confusing options
+
+### Fixed
+- Repository cleanup - removed development artifacts from git history
+- Documentation compliance with established style standards
+
 ## [0.4.1] - 2025-08-05
 
 ### Added - Phase 2: Scale and Performance Infrastructure
