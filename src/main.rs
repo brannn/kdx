@@ -75,7 +75,7 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
                         cli.limit,
                         cli.page_size,
                         true, // Use cache
-                        20, // Optimal concurrency for most clusters
+                        20,   // Optimal concurrency for most clusters
                         progress.as_ref(),
                     )
                     .await?;
@@ -176,7 +176,7 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
                         cli.limit,
                         cli.page_size,
                         true, // Use cache
-                        20, // Optimal concurrency for most clusters
+                        20,   // Optimal concurrency for most clusters
                         progress.as_ref(),
                     )
                     .await?;

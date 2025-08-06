@@ -40,8 +40,6 @@ pub struct Cli {
     #[clap(long, global = true)]
     pub show_progress: bool,
 
-
-
     /// Use streaming output for large datasets (JSON/YAML only)
     #[clap(long, global = true)]
     pub stream: bool,
