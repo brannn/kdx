@@ -13,7 +13,7 @@ A command-line tool for exploring and discovering resources in Kubernetes cluste
 
 ## Quick Demo
 
-### 🎯 Visual Service Topology & Dependency Mapping
+### Service Topology and Dependency Analysis
 
 ```console
 $ kdx topology grafana --namespace monitoring
@@ -29,33 +29,34 @@ $ kdx graph --namespace production --output dot | dot -Tpng -o architecture.png
 # Generate visual dependency graphs showing service relationships, ingress routes, and pod connections
 ```
 
-### ⚡ High-Performance Concurrent Discovery
+### Concurrent Discovery and Performance
 
 ```console
 $ kdx services --all-namespaces --concurrency 20 --show-progress --limit 100
 
 Discovering services across 47 namespaces...
-[████████████████████████████████████████] 47/47 namespaces (2.3s)
+Completed 47/47 namespaces (2.3s)
 
 NAME           NAMESPACE      TYPE           CLUSTER-IP     PORT(S)        AGE
 api-gateway    production     LoadBalancer   10.43.132.227  80:30080/TCP   5d
 auth-service   production     ClusterIP      10.43.132.228  8080/TCP       5d
 ...
 ```
-**Performance Features:**
-- `--concurrency 20`: Process 20 namespaces simultaneously (vs kubectl's sequential processing)
-- `--show-progress`: Real-time progress bar with timing and completion status
-- Intelligent caching with TTL for sub-second repeat queries
 
-### 🔍 Advanced Resource Discovery & Analysis
+Options explained:
+- `--concurrency 20`: Process 20 namespaces simultaneously
+- `--show-progress`: Display real-time progress with timing information
+- Caching system provides fast repeat queries
+
+### Advanced Resource Discovery
 
 ```console
-$ kdx deployments --selector 'app=web,tier!=cache' --group-by helm-release --unused
+$ kdx deployments --selector 'app=web,tier!=cache' --group-by helm-release
 
 === Deployment Group: web-frontend (helm-release) ===
-NAME           NAMESPACE    READY   UP-TO-DATE   AVAILABLE   STATUS
-web-frontend   production   3/3     3            3           Ready
-web-api        production   2/2     2            2           Ready
+NAME           NAMESPACE    READY   UP-TO-DATE   AVAILABLE   AGE
+web-frontend   production   3/3     3            3           5d
+web-api        production   2/2     2            2           5d
 
 $ kdx crds --with-instances --show-versions
 
@@ -64,14 +65,14 @@ prometheuses.monitoring.coreos.com monitoring.coreos.com v1        3          90
 certificates.cert-manager.io      cert-manager.io       v1        12         120d
 ```
 
-### 🛡️ Configuration Management & Security Analysis
+### Configuration Management and Security Analysis
 
 ```console
 $ kdx configmaps --unused --all-namespaces
 
 NAME                NAMESPACE     DATA   AGE    USED BY
-old-config          staging       3      30d    None ⚠️
-deprecated-settings production    1      45d    None ⚠️
+old-config          staging       3      30d    None
+deprecated-settings production    1      45d    None
 
 $ kdx secrets --secret-type kubernetes.io/tls --group-by namespace
 
