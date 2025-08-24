@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.4.3] - 2025-08-24
+
+### Security
+- **CRITICAL FIX**: Updated `slab` dependency from 0.4.10 to 0.4.11 to resolve RUSTSEC-2025-0047
+- Fixed out-of-bounds access vulnerability affecting tokio and other transitive dependencies
+- Updated 27 dependencies to latest compatible versions for improved security posture
+- All security audits now pass without critical vulnerabilities
+
+### Technical
+- Dependency updates maintain full backward compatibility
+- All 88 tests continue to pass
+- No breaking changes to CLI or functionality
+
 ## [0.4.2] - 2025-08-06
 
 ### Changed
